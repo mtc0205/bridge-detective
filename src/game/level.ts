@@ -1,0 +1,196 @@
+/**
+ * 关卡数据模型与解析校验(纯逻辑,可单元测试)。
+ *
+ * 关卡以 JSON 描述:热点 3D 坐标 + 标准答案 + 规范文案。
+ * 坐标系:桥轴线为 X(西 -> 东),横向为 Z,向上为 Y;与 `src/bridge/boxGirder.ts` 的几何常数一致。
+ *
+ * 说明:工程启用了 `erasableSyntaxOnly`,枚举一律用 const 数组 + 联合类型表达,不用 enum。
+ */
+
+/** 缺陷类型(游戏内判定口径)。「无缺陷」不是缺陷类型,答案里单独用 'none' 表达。 */
+export const DEFECT_TYPES = [
+  'crack', // 裂缝
+  'spalling', // 剥落 / 露筋
+  'bearingVoid', // 支座脱空
+  'expansionJoint', // 伸缩缝破损
+  'railingDamage', // 栏杆破损
+  'drainageBlock', // 排水堵塞
+  'other', // 其他(坑槽、渗水泛白等)
+] as const;
+
+export type DefectType = (typeof DEFECT_TYPES)[number];
+
+/** 热点答案允许的类型:某种缺陷,或 'none'(完好诱饵)。 */
+export type AnswerType = DefectType | 'none';
+
+export const SEVERITIES = ['light', 'medium', 'severe'] as const;
+export type Severity = (typeof SEVERITIES)[number];
+
+/** 答案允许的严重度:轻/中/重,或 'none'(仅当类型为「无缺陷」时)。 */
+export type AnswerSeverity = Severity | 'none';
+
+export const DEFECT_TYPE_LABELS: Record<DefectType, string> = {
+  crack: '裂缝',
+  spalling: '剥落 / 露筋',
+  bearingVoid: '支座脱空',
+  expansionJoint: '伸缩缝破损',
+  railingDamage: '栏杆破损',
+  drainageBlock: '排水堵塞',
+  other: '其他',
+};
+
+export const SEVERITY_LABELS: Record<Severity, string> = {
+  light: '轻',
+  medium: '中',
+  severe: '重',
+};
+
+export interface HotspotAnswer {
+  type: AnswerType;
+  severity: AnswerSeverity;
+}
+
+export interface HotspotData {
+  /** 关卡内唯一 ID,报告与回放引用 */
+  id: string;
+  /** 展示名(如「2号墩柱·混凝土剥落」) */
+  label: string;
+  /** 3D 锚点世界坐标 [x, y, z] */
+  position: [number, number, number];
+  /** 可交互半径(米),缺省 3.5;高位构件(如支座)可放宽 */
+  interactRadius?: number;
+  answer: HotspotAnswer;
+  /** 近景检测文案(M0 占位,M2 换 Lux3D 损伤贴图细节) */
+  description: string;
+  /** 规范依据(JTG/T H21-2011 简化条目,判定后展示) */
+  normNote: string;
+}
+
+export interface SpawnPointData {
+  position: [number, number, number];
+  /** 朝向角(度):0 朝 -Z,-90 朝 +X(东,桥尾方向) */
+  yawDeg: number;
+}
+
+export interface LevelData {
+  id: string;
+  caseName: string;
+  subtitle: string;
+  /** 案情简介(开场卡) */
+  brief: string;
+  /** 时限(秒) */
+  timeLimitSec: number;
+  spawn: SpawnPointData;
+  hotspots: HotspotData[];
+}
+
+/** 关卡 JSON 校验失败时抛出,信息面向关卡编辑器作者。 */
+export class LevelFormatError extends Error {
+  constructor(message: string) {
+    super(`[关卡格式错误] ${message}`);
+    this.name = 'LevelFormatError';
+  }
+}
+
+function asRecord(value: unknown, what: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new LevelFormatError(`${what} 应为对象`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function asString(value: unknown, what: string): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new LevelFormatError(`${what} 应为非空字符串`);
+  }
+  return value;
+}
+
+function asNumber(value: unknown, what: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new LevelFormatError(`${what} 应为有限数字`);
+  }
+  return value;
+}
+
+function asVec3(value: unknown, what: string): [number, number, number] {
+  if (
+    !Array.isArray(value) ||
+    value.length !== 3 ||
+    !value.every((n) => typeof n === 'number' && Number.isFinite(n))
+  ) {
+    throw new LevelFormatError(`${what} 应为 3 个有限数字 [x, y, z]`);
+  }
+  return [value[0] as number, value[1] as number, value[2] as number];
+}
+
+function isOneOf<T extends string>(value: unknown, options: readonly T[], what: string): T {
+  if (typeof value !== 'string' || !(options as readonly string[]).includes(value)) {
+    throw new LevelFormatError(`${what} 应为 ${options.join(' / ')} 之一`);
+  }
+  return value as T;
+}
+
+function parseHotspot(raw: unknown, index: number): HotspotData {
+  const h = asRecord(raw, `hotspots[${index}]`);
+  const answerRaw = asRecord(h.answer, `hotspots[${index}].answer`);
+  const type = isOneOf(answerRaw.type, [...DEFECT_TYPES, 'none'] as const, `hotspots[${index}].answer.type`);
+  const severity = isOneOf(
+    answerRaw.severity,
+    [...SEVERITIES, 'none'] as const,
+    `hotspots[${index}].answer.severity`,
+  );
+  if (type === 'none' && severity !== 'none') {
+    throw new LevelFormatError(`hotspots[${index}] 无缺陷热点的 severity 必须为 'none'`);
+  }
+  if (type !== 'none' && severity === 'none') {
+    throw new LevelFormatError(`hotspots[${index}] 缺陷热点的 severity 不能为 'none'`);
+  }
+  const hotspot: HotspotData = {
+    id: asString(h.id, `hotspots[${index}].id`),
+    label: asString(h.label, `hotspots[${index}].label`),
+    position: asVec3(h.position, `hotspots[${index}].position`),
+    answer: { type, severity },
+    description: asString(h.description, `hotspots[${index}].description`),
+    normNote: asString(h.normNote, `hotspots[${index}].normNote`),
+  };
+  if (h.interactRadius !== undefined) {
+    const r = asNumber(h.interactRadius, `hotspots[${index}].interactRadius`);
+    if (r <= 0 || r > 20) {
+      throw new LevelFormatError(`hotspots[${index}].interactRadius 应在 (0, 20] 米内`);
+    }
+    hotspot.interactRadius = r;
+  }
+  return hotspot;
+}
+
+/**
+ * 解析并校验关卡 JSON。任何字段不合法都会抛 LevelFormatError,
+ * 保证玩法层拿到的 LevelData 一定是完整自洽的。
+ */
+export function parseLevel(raw: unknown): LevelData {
+  const root = asRecord(raw, '关卡根对象');
+  const hotspotsRaw = root.hotspots;
+  if (!Array.isArray(hotspotsRaw) || hotspotsRaw.length === 0) {
+    throw new LevelFormatError('hotspots 应为非空数组');
+  }
+  const hotspots = hotspotsRaw.map((h, i) => parseHotspot(h, i));
+  const ids = new Set<string>();
+  for (const h of hotspots) {
+    if (ids.has(h.id)) throw new LevelFormatError(`热点 id 重复:${h.id}`);
+    ids.add(h.id);
+  }
+  const spawnRaw = asRecord(root.spawn, 'spawn');
+  return {
+    id: asString(root.id, 'id'),
+    caseName: asString(root.caseName, 'caseName'),
+    subtitle: asString(root.subtitle, 'subtitle'),
+    brief: asString(root.brief, 'brief'),
+    timeLimitSec: asNumber(root.timeLimitSec, 'timeLimitSec'),
+    spawn: {
+      position: asVec3(spawnRaw.position, 'spawn.position'),
+      yawDeg: asNumber(spawnRaw.yawDeg, 'spawn.yawDeg'),
+    },
+    hotspots,
+  };
+}
