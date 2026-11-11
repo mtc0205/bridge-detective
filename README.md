@@ -6,10 +6,11 @@
 (JTG/T H21-2011《公路桥梁技术状况评定标准》简化版)选择缺陷类型与严重度,
 结算时输出三部件加权 BCI 评级与可导出的检测报告。
 
-**当前版本:M1 交互闭环**(2026-11-12)。玩法全链路已通:观察 → 判定 →
+**当前版本:M2 三案件可玩**(2026-11-12)。玩法全链路已通:观察 → 判定 →
 反馈 → 记录 → 结算 → 报告(下载 Markdown / 打印 PDF)→ 漏检回放;
-案件场景为参数化程序箱梁桥占位,Lux3D 生成资产将于 M2 通过统一的
-`ILevelAsset` 接口接入(见下)。每晚进度见 PROGRESS.md。
+三案件(城市高架教学关 / 山村石拱桥应急检测 / 钱塘江大桥 1937 战损评估,
+含史实尾声卡)均为参数化程序资产占位,Lux3D glb 可通过 `asset.glb` 字段
+即插热切换(见下)。每晚进度见 PROGRESS.md。
 
 ## 快速开始
 
@@ -18,7 +19,7 @@ npm install       # 安装依赖(three@0.165 / vitest)
 npm run dev       # 开发服务器(默认 http://localhost:5173)
 npm run build     # 类型检查 + 产线构建(输出 dist/,纯静态可托管)
 npm run preview   # 本地预览构建产物
-npm run test      # vitest 单元测试(纯逻辑,68 个用例)
+npm run test      # vitest 单元测试(纯逻辑,82 个用例)
 npm run typecheck # 仅 tsc --noEmit
 ```
 
@@ -57,10 +58,15 @@ npm run typecheck # 仅 tsc --noEmit
 
 教学关 10 个检测点、7 类缺陷、1 个「完好诱饵」(正确答案是「无缺陷」,
 考察不误报);三部件各有布点,裂缝三形态齐备(网状 / 横向 / 纵向)。
+案件二(石拱桥)10 点 / 8 类,暴雨后应急叙事,拱石松动触发关键条款 → 四类;
+案件三(钱塘江 1937)12 点 / 6 类钢构病害,五孔落江两墩毁的可见简化占位,
+全计入 → 上部坍塌 → 五类危桥,结算后可翻「尾声 · 此桥必复」史实卡
+(1948《大公报》修复报道 / 1953 全面修复 / 今日服役,文案经 SOURCES.md 核对)。
 
 ## 关卡编辑器(内部工具,开发模式)
 
-`npm run dev` 后访问 `http://localhost:5173/?editor=1`(或任意部署地址加 `?editor=1`):
+`npm run dev` 后访问 `http://localhost:5173/?editor=1`(可用 `&level=stone-arch`
+或 `&level=qiantang-1937` 选底稿关卡):
 
 - 点击画面锁定指针后 **左键** 在桥体表面摆放 / 选中热点,**右键** 删除,`F` 传送到准星处;
 - `WASD + Q/E` 飞行(Shift 加速),方向键 / PgUp PgDn 微调选中热点,`[ ]` 切换,`Del` 删除;
@@ -69,18 +75,21 @@ npm run typecheck # 仅 tsc --noEmit
 - **保存**:parseLevel 预校验 → 下载 `{id}.json` + 复制到剪贴板,放入 `src/levels/` 即成新关卡;
   支持导入 JSON 回显继续编辑。
 
-M2 的石拱桥 / 钱塘江大桥两案即用此编辑器布点(16 类缺陷数据结构已就位)。
-
 ## 目录结构
 
 ```
 src/
 ├── main.ts                 # 入口:案件选择 / ?editor=1 编辑器 → Game 生命周期
 ├── levels/                 # 关卡 JSON(热点坐标 + 答案 + 部件 + 规范文案)
-│   └── tutorial-viaduct.json
+│   ├── tutorial-viaduct.json      # 案件一:教学关(10 点 / 7 类)
+│   ├── stone-arch-emergency.json  # 案件二:石拱桥应急(10 点 / 8 类)
+│   └── qiantang-1937-bridge.json  # 案件三:旗舰战损(12 点 / 6 类 + 尾声)
 ├── bridge/
-│   ├── levelAsset.ts       # ★ ILevelAsset 统一资产接口(M2 换 Lux3D 实现即插即用)
-│   └── boxGirder.ts        # M0 程序箱梁桥(桥面 90m×12m、双柱墩×2、栏杆、路堤、便道、河流)
+│   ├── levelAsset.ts       # ★ ILevelAsset 统一资产接口(Lux3D glb 即插即换)
+│   ├── gltfAsset.ts        # withLux3dVisuals:glb 视觉热切换,程序化兜底
+│   ├── boxGirder.ts        # 案件一程序箱梁桥(桥面 90m×12m、双柱墩、便道)
+│   ├── stoneArch.ts        # 案件二程序石拱桥(13 块楔形拱石、暴雨后氛围)
+│   └── steelTruss.ts       # 案件三程序华伦桁架(双层、断口、落江残骸)
 ├── player/
 │   ├── terrain.ts          # 纯逻辑碰撞:多层高度场 + AABB 墙(可测试)
 │   ├── terrain.test.ts
@@ -90,7 +99,8 @@ src/
 ├── game/
 │   ├── level.ts            # 关卡类型 + parseLevel/serializeLevel(编辑器 round-trip)
 │   ├── level.test.ts
-│   ├── cases.ts            # 案件注册表(三案件数据结构;后两案 M2 解锁)
+│   ├── cases.ts            # ★ 案件注册表(三案件;M2 换资产工厂只改这里)
+│   ├── cases.test.ts       # 注册表契约 + 史实口径断言
 │   ├── scoring.ts          # 判定计分(BRIEF 简化版)
 │   ├── scoring.test.ts
 │   ├── bci.ts              # 三部件加权 BCI + 关键隐患条款(1~5 类)
@@ -99,15 +109,16 @@ src/
 │   ├── codex.test.ts
 │   ├── session.ts          # 一局会话:判定记录 / 计分 / 计时 / 报告生成
 │   ├── session.test.ts
-│   └── game.ts             # 编排器:状态机(含图鉴 / 回放态)
+│   └── game.ts             # 编排器:状态机(含图鉴 / 回放态 / 尾声卡)
 ├── editor/                 # ?editor=1 关卡编辑器(独立 chunk)
 │   ├── editor.ts
 │   └── editorPanel.ts
+├── audio/sfx.ts            # WebAudio 合成音效占位
 └── ui/                     # 原生 DOM:Hud / 检测弹窗 / 图鉴 / 案件选择 / 结算 / 报告页
 ```
 
 测试只覆盖纯逻辑(判定计分、BCI 评级、图鉴完整性、关卡校验与序列化、
-会话端到端一致性、地形碰撞);3D 与 UI 不做单测。
+案件注册表契约、会话端到端一致性、地形碰撞);3D 与 UI 不做单测。
 
 ## 资产接口(M2 替换点)
 
@@ -116,20 +127,21 @@ src/
 - `root` 场景内容;`colliders` AABB 阻挡;`surfacesAt(x,z)` 多层可行走面;
 - `decorateScene(scene)` 天空 / 雾 / 光照;`update` / `dispose`。
 
-M2 Lux3D 解锁后实现 `Lux3DAssetFactory`(glb/gltf 或 3DGS iframe 方案),
-在 `cases.ts` 处替换 `createBoxGirderAsset` 即可,玩法与编辑器代码零改动。
+Lux3D 接入路径:导出 glb 放 `public/assets/levels/{案件id}.glb`,
+关卡 JSON 写 `"asset": { "glb": "/assets/levels/xxx.glb" }` 即热切换视觉
+(碰撞 / 出生点 / 热点坐标系仍用程序化常量,加载失败静默回退占位资产)。
 
 ## 路线图
 
 - **M0(11-11)✅** 骨架:工程 / 程序桥 / 控制器 / 热点 / 弹窗 / HUD / 结算骨架 / 测试
 - **M1(11-12)✅** 交互闭环:图鉴、三部件 BCI、报告导出(.md / 打印 PDF)、漏检回放、案件注册表、教学关 10 点布点、关卡编辑器;含 M3 顺手项(WebAudio 合成音效 + 结算入场动画雏形)
-- **M2(11-14~15)** Lux3D 真实资产生成与接入、三案件成品、性能优化(<20MB)
+- **M2(11-14~15)** 三案件程序化占位已全部可玩 ✅;待 Lux3D 解锁后生成真实资产接入、过程截图存档、性能优化(<20MB)
 - **M3(11-16~17)** 光影氛围(日落倒计时)/ 引导打磨 / 音画细化
 - **M4(11-18~19)** 报告书、演示视频、双通道部署(zai.site + GitHub Pages)
 
-## 已知限制(M1)
+## 已知限制(M2 占位期)
 
-- 场景为素色程序桥占位,损伤无贴图表现(近景为文字描述),Lux3D 资产 M2 接入
-- 音效为 WebAudio 实时合成占位(M3 可换 CC0 采样);结算动画为入场雏形
-- 弹窗数字快选键只支持前 9 类(各案件类型范围 ≤7,不受影响)
+- 三案件均为程序化素色占位,损伤无贴图表现(近景为文字描述 + 结构可视化),Lux3D 资产生成后接入
+- 钱塘江场景为「两孔落江 + 两墩毁」的可见简化(史实为五孔落江),开场卡已明示;钢桥远观热点半径 14/18m 待实机手感调校
+- 音效为 WebAudio 实时合成占位;弹窗数字快选键只支持前 9 类(各案件类型范围 ≤8,不受影响)
 - 不支持移动端触控(M3 评估降级方案)
