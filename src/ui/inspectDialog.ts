@@ -1,13 +1,16 @@
 /**
  * 检测弹窗(原生 DOM):
- * 热点名称 + 近景描述(占位文案)→ 缺陷类型单选 × 7 + 严重度三选 → 提交即时反馈。
+ * 热点名称 + 近景描述(占位文案)→ 缺陷类型单选(关卡范围)+ 严重度三选 → 提交即时反馈。
  *
  * 生命周期:
  *   open(hotspot) → 玩家选择 → resolve(InspectChoice | null)
  *   showFeedback(...) → 展示判定结果(正确/误报 + 规范依据)→「收起」→ closed Promise 结束
+ *
+ * 快捷键:数字 1-9 选类型、Q/W/E 选严重度、Enter 提交、Esc 取消;
+ * 「图鉴」按钮 / G 键打开判定图鉴(由 Game 注入回调,计时保持暂停)。
  */
 
-import { DEFECT_TYPES, DEFECT_TYPE_LABELS, SEVERITIES, SEVERITY_LABELS } from '../game/level';
+import { DEFECT_TYPE_LABELS, SEVERITIES, SEVERITY_LABELS } from '../game/level';
 import type { DefectType, HotspotData, Severity } from '../game/level';
 import type { InspectChoice } from '../game/scoring';
 
@@ -20,6 +23,13 @@ export interface DialogFeedback {
   scoreText: string;
 }
 
+export interface InspectDialogOptions {
+  /** 本关卡可选择的缺陷类型(来自 LevelData.defectTypes,缺省全集) */
+  types: readonly DefectType[];
+  /** 打开图鉴(不计时,图鉴覆盖在本弹窗之上) */
+  onOpenCodex: () => void;
+}
+
 export class InspectDialog {
   private readonly backdrop: HTMLElement;
   private readonly labelEl: HTMLElement;
@@ -28,6 +38,7 @@ export class InspectDialog {
   private readonly sevGrid: HTMLElement;
   private readonly submitBtn: HTMLButtonElement;
   private readonly noDefectBtn: HTMLButtonElement;
+  private readonly codexBtn: HTMLButtonElement;
   private readonly cancelBtn: HTMLButtonElement;
   private readonly formWrap: HTMLElement;
   private readonly feedbackWrap: HTMLElement;
@@ -36,13 +47,17 @@ export class InspectDialog {
   private readonly fbNorm: HTMLElement;
   private readonly fbScore: HTMLElement;
   private readonly ackBtn: HTMLButtonElement;
+  private readonly types: readonly DefectType[];
+  private readonly onOpenCodex: () => void;
 
   private choiceResolver: ((choice: InspectChoice | null) => void) | null = null;
   private closedResolver: (() => void) | null = null;
   private closedPromise: Promise<void> = Promise.resolve();
   private feedbackPhase = false;
 
-  constructor(parent: HTMLElement) {
+  constructor(parent: HTMLElement, options: InspectDialogOptions) {
+    this.types = options.types;
+    this.onOpenCodex = options.onOpenCodex;
     this.backdrop = document.createElement('div');
     this.backdrop.className = 'dialog-backdrop hidden';
 
@@ -80,7 +95,7 @@ export class InspectDialog {
     typeLegend.textContent = '缺陷类型';
     this.typeGrid = document.createElement('div');
     this.typeGrid.className = 'pill-grid';
-    DEFECT_TYPES.forEach((t, i) => {
+    this.types.forEach((t, i) => {
       this.typeGrid.append(this.makeRadio('dlg-type', t, DEFECT_TYPE_LABELS[t], String(i + 1)));
     });
     typeField.append(typeLegend, this.typeGrid);
@@ -93,7 +108,7 @@ export class InspectDialog {
     this.sevGrid = document.createElement('div');
     this.sevGrid.className = 'pill-grid pill-grid-3';
     SEVERITIES.forEach((s, i) => {
-      this.sevGrid.append(this.makeRadio('dlg-severity', s, SEVERITY_LABELS[s], ['轻', '中', '重'][i] ?? s));
+      this.sevGrid.append(this.makeRadio('dlg-severity', s, SEVERITY_LABELS[s], ['Q', 'W', 'E'][i] ?? s));
     });
     sevField.append(sevLegend, this.sevGrid);
 
@@ -110,7 +125,18 @@ export class InspectDialog {
     this.submitBtn.addEventListener('click', () => this.submitDefect());
     actions.append(this.noDefectBtn, this.submitBtn);
 
-    this.formWrap.append(typeField, sevField, actions);
+    const assist = document.createElement('div');
+    assist.className = 'dialog-assist';
+    this.codexBtn = document.createElement('button');
+    this.codexBtn.className = 'btn small';
+    this.codexBtn.textContent = '判定图鉴(G)';
+    this.codexBtn.addEventListener('click', () => this.onOpenCodex());
+    const hint = document.createElement('span');
+    hint.className = 'dialog-assist-hint';
+    hint.textContent = `不确定就不标 —— 误报扣分 · 数字键快选类型 ${this.types.length <= 9 ? `1-${this.types.length}` : ''}`;
+    assist.append(this.codexBtn, hint);
+
+    this.formWrap.append(typeField, sevField, actions, assist);
 
     this.feedbackWrap = document.createElement('div');
     this.feedbackWrap.className = 'dialog-feedback hidden';
@@ -265,10 +291,15 @@ export class InspectDialog {
       this.cancel();
       return;
     }
+    if (e.code === 'KeyG' && !this.feedbackPhase) {
+      e.stopPropagation();
+      this.onOpenCodex();
+      return;
+    }
     if (this.feedbackPhase) return;
-    // 数字键 1-7 快选缺陷类型,Q/W/E 快选严重度,Enter 提交
+    // 数字键 1-9 快选缺陷类型(类型数受限时自动收敛),Q/W/E 快选严重度,Enter 提交
     const num = Number(e.key);
-    if (num >= 1 && num <= DEFECT_TYPES.length) {
+    if (Number.isInteger(num) && num >= 1 && num <= Math.min(9, this.types.length)) {
       const input = this.typeGrid.querySelectorAll<HTMLInputElement>('input[type="radio"]')[num - 1];
       if (input) {
         input.checked = true;

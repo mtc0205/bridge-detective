@@ -1,46 +1,13 @@
 /**
  * 案件选择页(游戏入口,原生 DOM)。
- * M0 只开放教学关;两个后续案件以锁定卡形式展示路线图。
+ *
+ * 数据来自 `src/game/cases.ts` 注册表:教学关可直接进入;
+ * 山村石拱桥 / 钱塘江大桥 1937 暂显「即将解锁」,同时展示其规划病害类型
+ * (缺陷类型数据结构已就位,M2 出 Lux3D 资产后补关卡 JSON 即上架)。
  */
 
-interface CaseCard {
-  id: string;
-  tag: string;
-  name: string;
-  meta: string;
-  desc: string;
-  locked: boolean;
-  lockedNote?: string;
-}
-
-const CASES: CaseCard[] = [
-  {
-    id: 'tutorial-viaduct',
-    tag: '教学关',
-    name: '城市高架 · 教学检测',
-    meta: '9 个检测点 · 4 分钟 · 7 类缺陷',
-    desc: '三跨预应力混凝土连续箱梁桥,日常定期检测。上桥面、下便道,练习「观察 → 判定 → 定级」的完整流程。',
-    locked: false,
-  },
-  {
-    id: 'stone-arch',
-    tag: 'M1 解锁',
-    name: '山村石拱桥 · 应急检测',
-    meta: '暴雨后 · 砌石结构',
-    desc: '暴雨过后 24 小时应急排查:砌石风化、灰缝脱落、拱圈渗水、桥台冲刷。',
-    locked: true,
-    lockedNote: 'M1 内容排期',
-  },
-  {
-    id: 'qiantang-1949',
-    tag: 'M2 解锁',
-    name: '钱塘江大桥 1949 · 战损检测',
-    meta: '旗舰案件 · Lux3D 复原',
-    desc: '由历史照片生成战损钢桁梁桥:断杆、失铆、构件弯曲,为修复决策出具检测报告。',
-    locked: true,
-    lockedNote: '等待 Lux3D 资产',
-  },
-];
+import { CASES } from '../game/cases';
+import { DEFECT_TYPE_LABELS } from '../game/level';
 
 export class CaseSelectView {
   private readonly backdrop: HTMLElement;
@@ -61,7 +28,8 @@ export class CaseSelectView {
     title.textContent = '危桥侦探';
     const subtitle = document.createElement('p');
     subtitle.className = 'menu-sub';
-    subtitle.textContent = 'Bridge Detective —— 第一人称桥梁结构检测游戏:漫游危桥,按真实规范(JTG/T H21-2011)找出缺陷、定级、出具技术状况评定报告。';
+    subtitle.textContent =
+      'Bridge Detective —— 第一人称桥梁结构检测游戏:漫游危桥,按真实规范(JTG/T H21-2011)找出缺陷、定级、出具技术状况评定报告。';
     hero.append(eyebrow, title, subtitle);
 
     const cards = document.createElement('div');
@@ -79,20 +47,35 @@ export class CaseSelectView {
       meta.textContent = c.meta;
       const desc = document.createElement('p');
       desc.textContent = c.desc;
+      card.append(tag, name, meta, desc);
+
+      // 锁定案件:展示规划病害类型(数据结构就位的可视化承诺)
+      if (c.locked && c.plannedTypes && c.plannedTypes.length > 0) {
+        const chips = document.createElement('div');
+        chips.className = 'case-chips';
+        for (const t of c.plannedTypes) {
+          const chip = document.createElement('span');
+          chip.className = 'case-chip';
+          chip.textContent = DEFECT_TYPE_LABELS[t];
+          chips.append(chip);
+        }
+        card.append(chips);
+      }
+
       const action = document.createElement('button');
       action.className = 'btn primary';
-      action.textContent = c.locked ? (c.lockedNote ?? '未解锁') : '进入检测';
+      action.textContent = c.locked ? (c.lockedNote ?? '即将解锁') : '进入检测';
       action.disabled = c.locked;
       if (!c.locked) action.addEventListener('click', () => onEnter(c.id));
-      card.append(tag, name, meta, desc, action);
+      card.append(action);
       cards.append(card);
     }
 
     const footer = document.createElement('footer');
     footer.className = 'menu-footer';
     footer.innerHTML =
-      '<span>WASD 移动 · 鼠标 视角 · <b>E</b> 检测 · Shift 加速 · Esc 暂停</span>' +
-      '<span>桌面端 Chrome / Edge · M0 骨架版本(程序桥占位,Lux3D 资产 M2 接入)</span>';
+      '<span>WASD 移动 · 鼠标 视角 · <b>E</b> 检测 · <b>G</b> 图鉴 · Shift 加速 · Esc 暂停</span>' +
+      '<span>M1 交互闭环版(程序桥占位,Lux3D 资产 M2 接入)· 开发者:<b>?editor=1</b> 关卡编辑器</span>';
 
     wrap.append(hero, cards, footer);
     this.backdrop.append(wrap);

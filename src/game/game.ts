@@ -1,12 +1,13 @@
 /**
  * Game:一局游戏的编排器(Three.js 装配 + 状态机)。
  *
- * 状态机:ready → playing ⇄ paused / dialog → ended
+ * 状态机:ready → playing ⇄ paused / dialog / codex → ended
  *  - ready:开场卡(案情简介 + 操作说明),点击进入并锁定指针;
  *  - playing:控制器 / 热点 / 计时驱动;
  *  - paused:Esc 或指针解锁,点击继续;
  *  - dialog:检测弹窗打开(计时暂停);
- *  - ended:时间到或全部处理完 → 结算页。
+ *  - codex:图鉴覆盖层(从 playing 或 dialog 打开,计时暂停);
+ *  - ended:时间到或全部处理完 → 结算页 → 检测报告(下载 / 打印)。
  */
 
 import * as THREE from 'three';
@@ -14,11 +15,16 @@ import type { LevelAsset, LevelAssetFactory } from '../bridge/levelAsset';
 import { PlayerController } from '../player/controller';
 import { HotspotSystem } from '../gameplay/hotspot';
 import { Session } from './session';
+import { DEFECT_TYPES, DEFECT_TYPE_LABELS, SEVERITY_LABELS } from './level';
+import type { HotspotData, LevelData } from './level';
 import { Hud } from '../ui/hud';
 import { InspectDialog } from '../ui/inspectDialog';
 import type { DialogFeedback } from '../ui/inspectDialog';
 import { SettlementView } from '../ui/settlement';
-import type { HotspotData, LevelData } from './level';
+import type { SettlementStats } from '../ui/settlement';
+import { CodexView } from '../ui/codexView';
+import { ReportView } from '../ui/reportView';
+import type { ReportStats } from '../ui/reportView';
 
 export interface GameHooks {
   /** 返回案件选择页 */
@@ -27,7 +33,7 @@ export interface GameHooks {
   onRestart: () => void;
 }
 
-type GameState = 'ready' | 'playing' | 'paused' | 'dialog' | 'ended';
+type GameState = 'ready' | 'playing' | 'paused' | 'dialog' | 'codex' | 'ended';
 
 export class Game {
   private readonly host: HTMLElement;
@@ -41,6 +47,8 @@ export class Game {
   private readonly hud: Hud;
   private readonly dialog: InspectDialog;
   private readonly settlement: SettlementView;
+  private readonly codex: CodexView;
+  private readonly report: ReportView;
   private readonly session: Session;
   private readonly canvas: HTMLCanvasElement;
   private readonly clock = new THREE.Clock();
@@ -51,6 +59,9 @@ export class Game {
   private elapsed = 0;
   private activeHotspot: HotspotData | null = null;
   private disposed = false;
+  /** 打开图鉴前的状态(playing → 恢复游玩;dialog → 回到弹窗) */
+  private codexReturnState: 'playing' | 'dialog' | null = null;
+  private lastStats: SettlementStats | null = null;
 
   constructor(host: HTMLElement, level: LevelData, assetFactory: LevelAssetFactory, hooks: GameHooks) {
     this.host = host;
@@ -82,11 +93,20 @@ export class Game {
     this.hud.setProgress(0, level.hotspots.length);
     this.hud.setTime(level.timeLimitSec, level.timeLimitSec);
     this.hud.setVisible(false);
-    this.dialog = new InspectDialog(this.host);
+    this.dialog = new InspectDialog(this.host, {
+      types: level.defectTypes ?? DEFECT_TYPES,
+      onOpenCodex: () => this.openCodex('dialog'),
+    });
     this.settlement = new SettlementView(this.host, {
       onRestart: hooks.onRestart,
       onExit: hooks.onExit,
+      onShowReport: () => {
+        if (this.lastStats) this.report.show(this.buildReportStats());
+      },
     });
+    this.codex = new CodexView(this.host);
+    this.codex.onClose = () => this.onCodexClosed();
+    this.report = new ReportView(this.host, () => this.report.hide());
 
     // —— 开场卡 / 暂停层 ——
     this.startOverlay = this.buildStartOverlay();
@@ -128,6 +148,7 @@ export class Game {
       // 非游玩状态仍驱动标记动效(画面保持活性)
       this.hotspots.update(this.controller.camera, this.elapsed, dt);
     }
+    this.asset.update(this.elapsed, dt);
     this.renderer.render(this.scene, this.controller.camera);
   };
 
@@ -138,6 +159,9 @@ export class Game {
     if (e.code === 'KeyE' && !e.repeat && this.state === 'playing' && this.activeHotspot) {
       e.preventDefault();
       void this.openInspect(this.activeHotspot);
+    }
+    if (e.code === 'KeyG' && !e.repeat && this.state === 'playing') {
+      this.openCodex('playing');
     }
   };
 
@@ -176,7 +200,32 @@ export class Game {
     this.resumeFromDialog();
   }
 
-  /** 弹窗关闭后恢复游玩(「收起」点击即用户手势,可直接重锁指针)。 */
+  // —————————————————————— 图鉴 ——————————————————————
+
+  private openCodex(from: 'playing' | 'dialog'): void {
+    if (this.codex.visible) return;
+    this.codexReturnState = from;
+    if (from === 'playing') {
+      this.state = 'codex';
+      this.controller.enabled = false;
+      this.hud.setPrompt(null);
+      this.hud.setAim(false);
+      if (document.pointerLockElement) document.exitPointerLock();
+    }
+    this.codex.show();
+  }
+
+  private onCodexClosed(): void {
+    if (this.disposed) return;
+    if (this.codexReturnState === 'playing') {
+      this.codexReturnState = null;
+      this.resumeFromDialog(); // 复用:置 paused → 重锁指针 → 失败则暂停层
+    } else {
+      this.codexReturnState = null; // dialog:弹窗仍在,计时保持暂停
+    }
+  }
+
+  /** 弹窗 / 图鉴关闭后恢复游玩(「收起」点击即用户手势,可直接重锁指针)。 */
   private resumeFromDialog(): void {
     this.state = 'paused';
     this.pauseOverlay.classList.add('hidden');
@@ -226,24 +275,85 @@ export class Game {
     if (document.pointerLockElement) document.exitPointerLock();
     this.hud.setPrompt(null);
     this.hud.setAim(false);
-    const counts = this.session.counts;
-    this.settlement.show({
+    const stats = this.buildSettlementStats(reason);
+    this.lastStats = stats;
+    this.settlement.show(stats);
+  }
+
+  /** 结算页数据(与报告数据同源自 session,保证数字一致)。 */
+  private buildSettlementStats(reason: 'time' | 'done'): SettlementStats {
+    const s = this.session;
+    const bci = s.bciResult;
+    return {
       caseName: this.level.caseName,
+      caseId: this.level.id,
       endReason: reason,
-      score: this.session.score,
-      resolvedCount: this.session.resolvedCount,
+      score: s.score,
+      resolvedCount: s.resolvedCount,
       total: this.level.hotspots.length,
-      correct: counts.correct,
-      partial: counts.partial,
-      wrong: counts.wrong,
-      falsePositive: counts.falsePositive,
-      missed: this.session.missedHotspots().map((h) => ({ id: h.id, label: h.label })),
-      bci: this.session.bci,
-      grade: this.session.grade,
-      timeUsedSec: this.session.elapsedSec,
+      correct: s.counts.correct,
+      partial: s.counts.partial,
+      wrong: s.counts.wrong,
+      falsePositive: s.counts.falsePositive,
+      missed: s.missedHotspots().map((h) => ({
+        id: h.id,
+        label: h.label,
+        truthText:
+          h.answer.type === 'none'
+            ? '—'
+            : `${DEFECT_TYPE_LABELS[h.answer.type]}·${SEVERITY_LABELS[h.answer.severity]}`,
+      })),
+      bci: bci.overall,
+      componentBci: {
+        deck: bci.deck,
+        superstructure: bci.superstructure,
+        substructure: bci.substructure,
+      },
+      criticalTrigger: bci.criticalTrigger,
+      grade: s.grade,
+      timeUsedSec: s.elapsedSec,
       timeLimitSec: this.level.timeLimitSec,
-      markdown: this.session.buildReportMarkdown(),
-    });
+      markdown: s.buildReportMarkdown(),
+    };
+  }
+
+  /** 报告页数据(HTML 报告与 Markdown 同源)。 */
+  private buildReportStats(): ReportStats {
+    const s = this.session;
+    const bci = s.bciResult;
+    const counts = s.counts;
+    const missed = s.missedHotspots();
+    const fps = s.falsePositives();
+    const missedText =
+      missed.length === 0
+        ? '无漏检,检测记录完整。'
+        : `漏检 ${missed.length} 处:${missed
+            .map((h) =>
+              h.answer.type === 'none'
+                ? h.label
+                : `${h.label}(实际:${DEFECT_TYPE_LABELS[h.answer.type]}·${SEVERITY_LABELS[h.answer.severity]})`,
+            )
+            .join(';')}。`;
+    const falsePositiveText =
+      fps.length === 0 ? '' : `误报 ${fps.length} 处:${fps.map((r) => r.label).join(';')}。`;
+    const qualityText = `判定正确 ${counts.correct} / 严重度偏差 ${counts.partial} / 误判 ${counts.wrong} / 误报 ${counts.falsePositive} / 漏检 ${counts.missed};总得分 ${s.score}。`;
+    return {
+      caseId: this.level.id,
+      caseName: this.level.caseName,
+      subtitle: this.level.subtitle,
+      grade: s.grade,
+      componentBci: { deck: bci.deck, superstructure: bci.superstructure, substructure: bci.substructure },
+      overallBci: bci.overall,
+      criticalTrigger: bci.criticalTrigger,
+      groundTruthBci: s.groundTruthBci,
+      timeUsedSec: s.elapsedSec,
+      timeLimitSec: this.level.timeLimitSec,
+      rows: s.reportRows(),
+      missedText,
+      falsePositiveText,
+      qualityText,
+      markdown: s.buildReportMarkdown(),
+    };
   }
 
   // —————————————————————— 覆盖层 ——————————————————————
@@ -268,10 +378,10 @@ export class Game {
     controls.className = 'start-controls';
     controls.innerHTML =
       '<span><b>WASD</b> 移动</span><span><b>鼠标</b> 视角</span><span><b>E</b> 检测</span>' +
-      '<span><b>Shift</b> 加速</span><span><b>Esc</b> 暂停 / 释放指针</span>';
+      '<span><b>G</b> 判定图鉴</span><span><b>Shift</b> 加速</span><span><b>Esc</b> 暂停 / 释放指针</span>';
     const tip = document.createElement('p');
     tip.className = 'start-tip';
-    tip.textContent = '路线提示:沿桥面从西端走到东端下路堤,再从桥南侧绕到桥下便道,仰头检查支座。';
+    tip.textContent = '路线提示:沿桥面从西端走到东端下路堤,再从桥南侧绕到桥下便道,仰头检查梁体与支座。';
     const enterBtn = document.createElement('button');
     enterBtn.className = 'btn primary lg';
     enterBtn.textContent = '进入检测现场';
@@ -337,6 +447,8 @@ export class Game {
     this.asset.dispose();
     this.hud.dispose();
     this.dialog.dispose();
+    this.codex.dispose();
+    this.report.dispose();
     this.settlement.dispose();
     this.startOverlay.remove();
     this.pauseOverlay.remove();

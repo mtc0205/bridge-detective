@@ -1,11 +1,16 @@
 /**
- * 结算页(骨架):评级翻牌 + 成绩统计 + 生成报告(Markdown 文本预览,M1 完善导出)。
+ * 结算页(原生 DOM):评级翻牌 + 三部件 BCI + 成绩统计 + 漏检清单 + 报告入口。
+ *
+ * M1:BCI 按桥面系/上部/下部分部件展示;漏检条目标注实际缺陷;
+ * 「查看检测报告」由 Game 注入回调打开 ReportView(可下载 Markdown / 打印 PDF)。
+ * 漏检回放按钮(场景内高亮)由 Game 在存在漏检时启用。
  */
 
 import { GRADE_LABELS } from '../game/bci';
 
 export interface SettlementStats {
   caseName: string;
+  caseId: string;
   endReason: 'time' | 'done';
   score: number;
   resolvedCount: number;
@@ -14,17 +19,32 @@ export interface SettlementStats {
   partial: number;
   wrong: number;
   falsePositive: number;
-  missed: { id: string; label: string }[];
+  missed: { id: string; label: string; truthText: string }[];
   bci: number;
+  componentBci: { deck: number; superstructure: number; substructure: number };
+  criticalTrigger: string | null;
   grade: 1 | 2 | 3 | 4 | 5;
   timeUsedSec: number;
   timeLimitSec: number;
   markdown: string;
 }
 
+export interface SettlementCallbacks {
+  onRestart: () => void;
+  onExit: () => void;
+  onShowReport: () => void;
+}
+
 function formatTime(sec: number): string {
   const s = Math.max(0, Math.round(sec));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function el(tag: string, className = '', text = ''): HTMLElement {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text) node.textContent = text;
+  return node;
 }
 
 export class SettlementView {
@@ -33,6 +53,10 @@ export class SettlementView {
   private readonly gradeNumEl: HTMLElement;
   private readonly gradeTextEl: HTMLElement;
   private readonly bciEl: HTMLElement;
+  private readonly compDeck: HTMLElement;
+  private readonly compSup: HTMLElement;
+  private readonly compSub: HTMLElement;
+  private readonly criticalEl: HTMLElement;
   private readonly statScore: HTMLElement;
   private readonly statCorrect: HTMLElement;
   private readonly statPartial: HTMLElement;
@@ -40,136 +64,100 @@ export class SettlementView {
   private readonly statMissed: HTMLElement;
   private readonly statTime: HTMLElement;
   private readonly missedListEl: HTMLElement;
-  private readonly reportPanel: HTMLElement;
-  private readonly reportText: HTMLElement;
+  private readonly reportBtn: HTMLButtonElement;
+  private readonly replayBtn: HTMLButtonElement;
 
-  constructor(
-    parent: HTMLElement,
-    callbacks: { onRestart: () => void; onExit: () => void },
-  ) {
-    this.backdrop = document.createElement('div');
-    this.backdrop.className = 'settlement-backdrop hidden';
+  private readonly callbacks: SettlementCallbacks;
 
-    const panel = document.createElement('div');
-    panel.className = 'settlement-panel';
+  constructor(parent: HTMLElement, callbacks: SettlementCallbacks) {
+    this.callbacks = callbacks;
+    this.backdrop = el('div', 'settlement-backdrop hidden');
 
-    const header = document.createElement('header');
-    header.className = 'settlement-header';
-    const titleBox = document.createElement('div');
-    const title = document.createElement('h2');
-    title.textContent = '检测结束 · 技术状况评定';
-    this.reasonEl = document.createElement('span');
-    this.reasonEl.className = 'settlement-reason';
+    const panel = el('div', 'settlement-panel');
+
+    const header = el('header', 'settlement-header');
+    const titleBox = el('div');
+    const title = el('h2', '', '检测结束 · 技术状况评定');
+    this.reasonEl = el('span', 'settlement-reason');
     titleBox.append(title, this.reasonEl);
 
-    // 评级翻牌区(M3 加动画)
-    const gradeBox = document.createElement('div');
-    gradeBox.className = 'grade-card';
-    this.gradeNumEl = document.createElement('div');
-    this.gradeNumEl.className = 'grade-num';
-    this.gradeTextEl = document.createElement('div');
-    this.gradeTextEl.className = 'grade-text';
-    const bciLabel = document.createElement('span');
-    bciLabel.className = 'grade-bci-label';
-    bciLabel.textContent = '简化 BCI';
-    this.bciEl = document.createElement('div');
-    this.bciEl.className = 'grade-bci';
-    const bciBox = document.createElement('div');
-    bciBox.className = 'grade-bci-box';
+    // 评级区
+    const gradeBox = el('div', 'grade-card');
+    this.gradeNumEl = el('div', 'grade-num');
+    this.gradeTextEl = el('div', 'grade-text');
+    const bciLabel = el('span', 'grade-bci-label', '整体 BCI');
+    this.bciEl = el('div', 'grade-bci');
+    const bciBox = el('div', 'grade-bci-box');
     bciBox.append(bciLabel, this.bciEl);
     gradeBox.append(this.gradeNumEl, this.gradeTextEl, bciBox);
 
+    // 分部件 BCI + 关键条款
+    const compBox = el('div', 'comp-row');
+    const mkComp = (label: string): { item: HTMLElement; value: HTMLElement } => {
+      const item = el('div', 'comp-item');
+      const value = el('b', 'comp-value');
+      item.append(el('span', 'comp-label', label), value);
+      compBox.append(item);
+      return { item, value };
+    };
+    this.compDeck = mkComp('桥面系').value;
+    this.compSup = mkComp('上部结构').value;
+    this.compSub = mkComp('下部结构').value;
+    this.criticalEl = el('p', 'critical-note hidden');
+
     // 统计
-    const stats = document.createElement('div');
-    stats.className = 'settlement-stats';
-    const stat = (label: string): { item: HTMLElement; value: HTMLElement } => {
-      const item = document.createElement('div');
-      item.className = 'stat-item';
-      const l = document.createElement('span');
-      l.textContent = label;
-      const v = document.createElement('b');
+    const stats = el('div', 'settlement-stats');
+    const stat = (label: string): HTMLElement => {
+      const item = el('div', 'stat-item');
+      const l = el('span', '', label);
+      const v = el('b');
       item.append(l, v);
       stats.append(item);
-      return { item, value: v };
+      return v;
     };
-    this.statScore = stat('总得分').value;
-    this.statCorrect = stat('判定正确').value;
-    this.statPartial = stat('严重度偏差').value;
-    this.statFalsePositive = stat('误报').value;
-    this.statMissed = stat('漏检').value;
-    this.statTime = stat('用时').value;
+    this.statScore = stat('总得分');
+    this.statCorrect = stat('判定正确');
+    this.statPartial = stat('严重度偏差');
+    this.statFalsePositive = stat('误报');
+    this.statMissed = stat('漏检');
+    this.statTime = stat('用时');
 
     // 漏检清单
-    const missedBox = document.createElement('div');
-    missedBox.className = 'missed-box';
-    const missedTitle = document.createElement('span');
-    missedTitle.className = 'missed-title';
-    missedTitle.textContent = '漏检回放(M1:结算后高亮显示位置)';
-    this.missedListEl = document.createElement('div');
-    this.missedListEl.className = 'missed-list';
+    const missedBox = el('div', 'missed-box');
+    const missedTitle = el('span', 'missed-title', '漏检清单(可回放定位)');
+    this.missedListEl = el('div', 'missed-list');
     missedBox.append(missedTitle, this.missedListEl);
 
     // 操作
-    const actions = document.createElement('div');
-    actions.className = 'settlement-actions';
-    const reportBtn = document.createElement('button');
-    reportBtn.className = 'btn primary';
-    reportBtn.textContent = '生成检测报告';
-    reportBtn.addEventListener('click', () => this.reportPanel.classList.remove('hidden'));
-    const restartBtn = document.createElement('button');
-    restartBtn.className = 'btn';
+    const actions = el('div', 'settlement-actions');
+    this.reportBtn = el('button', 'btn primary') as HTMLButtonElement;
+    this.reportBtn.textContent = '查看检测报告';
+    this.reportBtn.addEventListener('click', () => this.callbacks.onShowReport());
+    this.replayBtn = el('button', 'btn') as HTMLButtonElement;
+    this.replayBtn.textContent = '漏检回放';
+    const restartBtn = el('button', 'btn') as HTMLButtonElement;
     restartBtn.textContent = '再测一次';
     restartBtn.addEventListener('click', () => {
       this.hide();
       callbacks.onRestart();
     });
-    const exitBtn = document.createElement('button');
-    exitBtn.className = 'btn ghost';
+    const exitBtn = el('button', 'btn ghost') as HTMLButtonElement;
     exitBtn.textContent = '返回案件选择';
     exitBtn.addEventListener('click', () => {
       this.hide();
       callbacks.onExit();
     });
-    actions.append(reportBtn, restartBtn, exitBtn);
-
-    // 报告面板(Markdown 文本预览)
-    this.reportPanel = document.createElement('div');
-    this.reportPanel.className = 'report-panel hidden';
-    const reportHead = document.createElement('div');
-    reportHead.className = 'report-head';
-    const reportTitle = document.createElement('h3');
-    reportTitle.textContent = '检测报告(Markdown)';
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'btn small';
-    copyBtn.textContent = '复制全文';
-    copyBtn.addEventListener('click', () => {
-      void navigator.clipboard?.writeText(this.reportText.textContent ?? '').then(
-        () => {
-          copyBtn.textContent = '已复制 ✓';
-          window.setTimeout(() => (copyBtn.textContent = '复制全文'), 1600);
-        },
-        () => {
-          copyBtn.textContent = '复制失败(手动选择)';
-        },
-      );
-    });
-    const closeReportBtn = document.createElement('button');
-    closeReportBtn.className = 'icon-btn';
-    closeReportBtn.textContent = '✕';
-    closeReportBtn.setAttribute('aria-label', '关闭报告');
-    closeReportBtn.addEventListener('click', () => this.reportPanel.classList.add('hidden'));
-    reportHead.append(reportTitle, copyBtn, closeReportBtn);
-    this.reportText = document.createElement('pre');
-    this.reportText.className = 'report-pre';
-    const reportNote = document.createElement('p');
-    reportNote.className = 'report-note';
-    reportNote.textContent = 'M0:先输出 Markdown 文本;M1 完善 .md 文件下载与浏览器打印 PDF 版式。';
-    this.reportPanel.append(reportHead, this.reportText, reportNote);
+    actions.append(this.reportBtn, this.replayBtn, restartBtn, exitBtn);
 
     header.append(titleBox);
-    panel.append(header, gradeBox, stats, missedBox, actions, this.reportPanel);
+    panel.append(header, gradeBox, compBox, this.criticalEl, stats, missedBox, actions);
     this.backdrop.append(panel);
     parent.append(this.backdrop);
+  }
+
+  /** 设置漏检回放回调(Game 注入;无漏检时按钮隐藏)。 */
+  setReplayHandler(handler: (() => void) | null): void {
+    this.replayBtn.onclick = handler ? () => handler() : null;
   }
 
   show(stats: SettlementStats): void {
@@ -179,28 +167,33 @@ export class SettlementView {
     this.gradeTextEl.textContent = GRADE_LABELS[stats.grade];
     this.gradeNumEl.dataset.grade = String(stats.grade);
     this.bciEl.textContent = stats.bci.toFixed(1);
+    this.compDeck.textContent = stats.componentBci.deck.toFixed(1);
+    this.compSup.textContent = stats.componentBci.superstructure.toFixed(1);
+    this.compSub.textContent = stats.componentBci.substructure.toFixed(1);
+    this.criticalEl.classList.toggle('hidden', !stats.criticalTrigger);
+    if (stats.criticalTrigger) {
+      this.criticalEl.textContent =
+        '⚠ 关键安全隐患条款:重级「支座脱空 / 构件断裂」→ BCI 上限 57(四类·不合格)';
+    }
     this.statScore.textContent = String(stats.score);
     this.statCorrect.textContent = `${stats.correct}/${stats.total}`;
     this.statPartial.textContent = String(stats.partial);
     this.statFalsePositive.textContent = String(stats.falsePositive);
     this.statMissed.textContent = String(stats.missed.length);
     this.statTime.textContent = `${formatTime(stats.timeUsedSec)} / ${formatTime(stats.timeLimitSec)}`;
+
     this.missedListEl.replaceChildren();
     if (stats.missed.length === 0) {
-      const none = document.createElement('span');
-      none.className = 'missed-none';
-      none.textContent = '无漏检,检测记录完整。';
+      const none = el('span', 'missed-none', '无漏检,检测记录完整。');
       this.missedListEl.append(none);
     } else {
       for (const m of stats.missed) {
-        const chip = document.createElement('span');
-        chip.className = 'missed-chip';
-        chip.textContent = m.label;
+        const chip = el('span', 'missed-chip');
+        chip.textContent = `${m.label} · 实际:${m.truthText}`;
         this.missedListEl.append(chip);
       }
     }
-    this.reportText.textContent = stats.markdown;
-    this.reportPanel.classList.add('hidden');
+
     this.backdrop.classList.remove('hidden');
   }
 
