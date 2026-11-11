@@ -132,6 +132,28 @@ export class PlayerController {
     this.camera.updateProjectionMatrix();
   }
 
+  /**
+   * 传送到能观察到目标的站位(漏检回放用):
+   * 在目标东南侧偏移一小步,落到该立柱最高可站立面(桥面或地面),视线对准目标。
+   */
+  teleportToView(tx: number, ty: number, tz: number): void {
+    const ex = tx + 2.6;
+    const ez = Math.max(-4.2, tz + 2.6); // 不越过北侧河道
+    const ground = pickSurface(this.asset.surfacesAt(ex, ez), Number.MAX_SAFE_INTEGER) ?? 0;
+    this.posX = ex;
+    this.posZ = ez;
+    this.feetY = ground + 0.05;
+    this.velX = 0;
+    this.velZ = 0;
+    this.velY = 0;
+    const dx = tx - ex;
+    const dy = ty - (this.feetY + EYE_HEIGHT);
+    const dz = tz - ez;
+    this.yaw = Math.atan2(-dx, -dz);
+    this.pitch = THREE.MathUtils.clamp(Math.atan2(dy, Math.hypot(dx, dz)), -PITCH_LIMIT, PITCH_LIMIT);
+    this.applyCamera();
+  }
+
   dispose(): void {
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);

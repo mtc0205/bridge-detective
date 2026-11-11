@@ -158,6 +158,7 @@ export class SettlementView {
   /** 设置漏检回放回调(Game 注入;无漏检时按钮隐藏)。 */
   setReplayHandler(handler: (() => void) | null): void {
     this.replayBtn.onclick = handler ? () => handler() : null;
+    this.replayBtn.classList.toggle('hidden', handler === null);
   }
 
   show(stats: SettlementStats): void {

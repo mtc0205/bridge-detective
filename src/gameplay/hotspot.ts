@@ -30,6 +30,8 @@ interface Marker {
   group: THREE.Group;
   core: THREE.Mesh<THREE.OctahedronGeometry, THREE.MeshStandardMaterial>;
   glow: THREE.Sprite;
+  /** 漏检回放信标(未高亮时为 null) */
+  beacon: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshBasicMaterial> | null;
   /** 呼吸相位(按热点错开) */
   phase: number;
   state: MarkerState;
@@ -37,6 +39,7 @@ interface Marker {
 
 /** 模块级共享资源(多个 Game 实例复用;进程内不释放)。 */
 const CORE_GEOMETRY = new THREE.OctahedronGeometry(0.16);
+const BEACON_GEOMETRY = new THREE.CylinderGeometry(0.3, 0.3, 60, 10, 1, true);
 let glowTexture: THREE.CanvasTexture | null = null;
 
 function getGlowTexture(): THREE.CanvasTexture {
@@ -91,7 +94,7 @@ export class HotspotSystem {
       glow.scale.set(1.15, 1.15, 1);
       group.add(core, glow);
       scene.add(group);
-      this.markers.push({ data, group, core, glow, phase: i * 1.7, state: 'pending' });
+      this.markers.push({ data, group, core, glow, beacon: null, phase: i * 1.7, state: 'pending' });
     });
   }
 
@@ -112,6 +115,13 @@ export class HotspotSystem {
       m.core.rotation.y += dt * 1.4;
       const pulse = 1.05 + Math.sin(elapsedSec * 3.0 + m.phase) * 0.12;
       m.glow.scale.set(pulse, pulse, 1);
+
+      // —— 漏检信标:贯穿全高的光柱,远近可见 ——
+      if (m.beacon) {
+        const b = Math.sin(elapsedSec * 4.2 + m.phase) * 0.5 + 0.5; // 0..1
+        m.beacon.material.opacity = 0.16 + b * 0.22;
+        m.beacon.scale.set(1 + b * 0.35, 1, 1 + b * 0.35);
+      }
 
       if (m.state !== 'pending' && m.state !== 'active') continue;
 
@@ -171,11 +181,49 @@ export class HotspotSystem {
     m.core.scale.setScalar(scale);
   }
 
+  /**
+   * 漏检回放:给指定热点加红色光柱信标(高 60m,任何位置可见),
+   * 重复调用会先清除旧信标。
+   */
+  highlightMissed(ids: readonly string[]): void {
+    for (const m of this.markers) {
+      if (m.beacon) {
+        m.group.remove(m.beacon);
+        m.beacon.material.dispose();
+        m.beacon = null;
+      }
+      if (ids.includes(m.data.id)) {
+        const beacon = new THREE.Mesh(
+          BEACON_GEOMETRY,
+          new THREE.MeshBasicMaterial({
+            color: 0xff5a4a,
+            transparent: true,
+            opacity: 0.25,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+          }),
+        );
+        beacon.position.y = 30;
+        m.group.add(beacon);
+        m.beacon = beacon;
+        // 信标态:核心回到醒目的红色
+        this.setState(m, 'wrong');
+        m.core.material.emissiveIntensity = 1.6;
+        m.glow.material.opacity = 0.9;
+      }
+    }
+  }
+
   dispose(scene: THREE.Scene): void {
     for (const m of this.markers) {
       scene.remove(m.group);
       m.core.material.dispose();
       m.glow.material.dispose();
+      if (m.beacon) {
+        m.beacon.material.dispose();
+        m.beacon = null;
+      }
     }
     this.markers.length = 0;
   }

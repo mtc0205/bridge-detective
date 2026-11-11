@@ -33,7 +33,7 @@ export interface GameHooks {
   onRestart: () => void;
 }
 
-type GameState = 'ready' | 'playing' | 'paused' | 'dialog' | 'codex' | 'ended';
+type GameState = 'ready' | 'playing' | 'paused' | 'dialog' | 'codex' | 'ended' | 'replay';
 
 export class Game {
   private readonly host: HTMLElement;
@@ -54,6 +54,8 @@ export class Game {
   private readonly clock = new THREE.Clock();
   private readonly startOverlay: HTMLElement;
   private readonly pauseOverlay: HTMLElement;
+  private readonly replayBar: HTMLElement;
+  private readonly replayLabelEl: HTMLElement;
 
   private state: GameState = 'ready';
   private elapsed = 0;
@@ -62,6 +64,9 @@ export class Game {
   /** 打开图鉴前的状态(playing → 恢复游玩;dialog → 回到弹窗) */
   private codexReturnState: 'playing' | 'dialog' | null = null;
   private lastStats: SettlementStats | null = null;
+  /** 漏检回放目标与当前下标 */
+  private replayTargets: HotspotData[] = [];
+  private replayIndex = 0;
 
   constructor(host: HTMLElement, level: LevelData, assetFactory: LevelAssetFactory, hooks: GameHooks) {
     this.host = host;
@@ -108,9 +113,12 @@ export class Game {
     this.codex.onClose = () => this.onCodexClosed();
     this.report = new ReportView(this.host, () => this.report.hide());
 
-    // —— 开场卡 / 暂停层 ——
+    // —— 开场卡 / 暂停层 / 回放条 ——
     this.startOverlay = this.buildStartOverlay();
     this.pauseOverlay = this.buildPauseOverlay();
+    const bar = this.buildReplayBar();
+    this.replayBar = bar.root;
+    this.replayLabelEl = bar.label;
 
     // —— 事件 ——
     window.addEventListener('resize', this.onResize);
@@ -132,17 +140,20 @@ export class Game {
   private readonly frame = (): void => {
     if (this.disposed) return;
     const dt = Math.min(this.clock.getDelta(), 0.05);
-    if (this.state === 'playing') {
+    if (this.state === 'playing' || this.state === 'replay') {
       this.elapsed += dt;
       this.controller.update(dt);
-      this.activeHotspot = this.hotspots.update(this.controller.camera, this.elapsed, dt);
-      this.hud.setAim(this.activeHotspot !== null);
-      this.hud.setPrompt(this.activeHotspot ? `E · 检测:${this.activeHotspot.label}` : null);
+      const aimed = this.hotspots.update(this.controller.camera, this.elapsed, dt);
+      if (this.state === 'playing') {
+        this.activeHotspot = aimed;
+        this.hud.setAim(aimed !== null);
+        this.hud.setPrompt(aimed ? `E · 检测:${aimed.label}` : null);
 
-      this.session.tick(dt);
-      this.hud.setTime(this.session.timeLeft, this.level.timeLimitSec);
-      if (this.session.timeUp) {
-        this.endGame('time');
+        this.session.tick(dt);
+        this.hud.setTime(this.session.timeLeft, this.level.timeLimitSec);
+        if (this.session.timeUp) {
+          this.endGame('time');
+        }
       }
     } else {
       // 非游玩状态仍驱动标记动效(画面保持活性)
@@ -156,6 +167,12 @@ export class Game {
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     if (this.disposed) return;
+    if (this.state === 'replay') {
+      if (e.code === 'KeyN' && !e.repeat) this.replayStep(1);
+      else if (e.code === 'KeyP' && !e.repeat) this.replayStep(-1);
+      else if (e.key === 'Escape') this.exitReplay();
+      return;
+    }
     if (e.code === 'KeyE' && !e.repeat && this.state === 'playing' && this.activeHotspot) {
       e.preventDefault();
       void this.openInspect(this.activeHotspot);
@@ -277,7 +294,54 @@ export class Game {
     this.hud.setAim(false);
     const stats = this.buildSettlementStats(reason);
     this.lastStats = stats;
+    this.settlement.setReplayHandler(stats.missed.length > 0 ? () => this.enterReplay() : null);
     this.settlement.show(stats);
+  }
+
+  // —————————————————————— 漏检回放 ——————————————————————
+
+  /** 进入回放:漏检热点加红色光柱信标,逐个传送到观察位(WASD 可自由走动)。 */
+  private enterReplay(): void {
+    if (this.state !== 'ended') return;
+    const targets = this.session.missedHotspots();
+    if (targets.length === 0) return;
+    this.replayTargets = targets;
+    this.replayIndex = 0;
+    this.settlement.hide();
+    this.report.hide();
+    this.hud.setVisible(false);
+    this.state = 'replay';
+    this.controller.enabled = true;
+    this.hotspots.highlightMissed(targets.map((h) => h.id));
+    this.focusReplayTarget();
+    this.replayBar.classList.remove('hidden');
+  }
+
+  private focusReplayTarget(): void {
+    const h = this.replayTargets[this.replayIndex];
+    if (!h) return;
+    this.controller.teleportToView(h.position[0], h.position[1], h.position[2]);
+    const truth =
+      h.answer.type === 'none'
+        ? '—'
+        : `${DEFECT_TYPE_LABELS[h.answer.type]}·${SEVERITY_LABELS[h.answer.severity]}`;
+    this.replayLabelEl.textContent = `${this.replayIndex + 1}/${this.replayTargets.length} · ${h.label}(实际:${truth})`;
+  }
+
+  private replayStep(dir: 1 | -1): void {
+    const n = this.replayTargets.length;
+    if (n === 0) return;
+    this.replayIndex = (this.replayIndex + dir + n) % n;
+    this.focusReplayTarget();
+  }
+
+  private exitReplay(): void {
+    if (this.state !== 'replay') return;
+    this.state = 'ended';
+    this.controller.enabled = false;
+    this.replayBar.classList.add('hidden');
+    this.hotspots.highlightMissed([]); // 清除信标
+    if (this.lastStats) this.settlement.show(this.lastStats);
   }
 
   /** 结算页数据(与报告数据同源自 session,保证数字一致)。 */
@@ -425,6 +489,32 @@ export class Game {
     return overlay;
   }
 
+  /** 漏检回放底部切换条(N/P 键与按钮等价)。 */
+  private buildReplayBar(): { root: HTMLElement; label: HTMLElement } {
+    const bar = document.createElement('div');
+    bar.className = 'replay-bar hidden';
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'btn small';
+    prevBtn.textContent = '◀ 上一处 (P)';
+    prevBtn.addEventListener('click', () => this.replayStep(-1));
+    const label = document.createElement('span');
+    label.className = 'replay-label';
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'btn small';
+    nextBtn.textContent = '下一处 (N) ▶';
+    nextBtn.addEventListener('click', () => this.replayStep(1));
+    const exitBtn = document.createElement('button');
+    exitBtn.className = 'btn small ghost';
+    exitBtn.textContent = '结束回放';
+    exitBtn.addEventListener('click', () => this.exitReplay());
+    const hint = document.createElement('span');
+    hint.className = 'replay-hint';
+    hint.textContent = '红色光柱 = 漏检位置 · WASD 自由走动复盘';
+    bar.append(prevBtn, label, nextBtn, exitBtn, hint);
+    this.host.append(bar);
+    return { root: bar, label };
+  }
+
   // —————————————————————— 生命周期 ——————————————————————
 
   private readonly onResize = (): void => {
@@ -452,6 +542,7 @@ export class Game {
     this.settlement.dispose();
     this.startOverlay.remove();
     this.pauseOverlay.remove();
+    this.replayBar.remove();
     for (const child of [...this.scene.children]) this.scene.remove(child);
     this.renderer.dispose();
     this.canvas.remove();
