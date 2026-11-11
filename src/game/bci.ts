@@ -6,8 +6,8 @@
  * 部件 BCI = 100 − Σ(缺陷类型权重 × 严重度系数),整体 BCI = Σ(部件 BCI × 部件权重)。
  *
  * 关键安全隐患条款(简化自「严重影响安全的缺损可直接评定为不合格」):
- *   支座脱空·重 或 构件断裂·重 → 整体 BCI 上限 57(压入四类·不合格),
- *   对应 BRIEF「支座脱空 = 直接安全隐患」的判定规则,让漏检后果可见。
+ *   支座脱空·重 / 构件断裂·重 / 拱圈砌石松动·重 → 整体 BCI 上限 57(压入四类·不合格),
+ *   对应 BRIEF「支座脱空 = 直接安全隐患」等判定规则,让漏检后果可见。
  */
 
 import type { BridgeComponent } from './level';
@@ -61,6 +61,7 @@ export const COMPONENT_WEIGHT: Record<BridgeComponent, number> = {
 export const CRITICAL_RULES: readonly { type: DefectType; note: string }[] = [
   { type: 'bearingVoid', note: '支座脱空(重)属直接安全隐患,应立即限载并更换支座' },
   { type: 'memberFracture', note: '主要构件断裂(重)已危及整体安全,应立即封闭交通' },
+  { type: 'stoneLoose', note: '拱圈砌石松动(重)可能引发拱圈失稳,应立即设临时支撑并限载' },
 ];
 
 /** 关键隐患触发后的整体 BCI 上限(压入四类·不合格)。 */

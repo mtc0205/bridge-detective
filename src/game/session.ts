@@ -243,7 +243,7 @@ export class Session {
     lines.push('');
     lines.push(`- **整体 BCI = ${bci.overall.toFixed(1)}**`);
     if (bci.criticalTrigger) {
-      lines.push(`- **触发关键安全隐患条款:** 重级「支座脱空 / 构件断裂」直接压低评定,BCI 上限 ${CRITICAL_BCI_CAP}(四类·不合格)。`);
+      lines.push(`- **触发关键安全隐患条款:** 重级「支座脱空 / 构件断裂 / 拱圈砌石松动」直接压低评定,BCI 上限 ${CRITICAL_BCI_CAP}(四类·不合格)。`);
     }
     lines.push(`- **技术状况等级:${GRADE_LABELS[this.grade]}**`);
     lines.push(`- **处理建议:** ${GRADE_ACTIONS[this.grade]}`);

@@ -180,7 +180,7 @@ export class SettlementView {
     this.criticalEl.classList.toggle('hidden', !stats.criticalTrigger);
     if (stats.criticalTrigger) {
       this.criticalEl.textContent =
-        '⚠ 关键安全隐患条款:重级「支座脱空 / 构件断裂」→ BCI 上限 57(四类·不合格)';
+        '⚠ 关键安全隐患条款:重级「支座脱空 / 构件断裂 / 拱圈砌石松动」→ BCI 上限 57(四类·不合格)';
     }
     this.statScore.textContent = String(stats.score);
     this.statCorrect.textContent = `${stats.correct}/${stats.total}`;

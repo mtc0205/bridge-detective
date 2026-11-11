@@ -62,6 +62,12 @@ describe('computeBci 三部件加权(M1)', () => {
     expect(r.overall).toBe(CRITICAL_BCI_CAP);
   });
 
+  it('拱圈砌石松动(重)触发关键隐患条款(M2 石拱桥案件)', () => {
+    const r = computeBci([{ type: 'stoneLoose', severity: 'severe', component: 'superstructure' }]);
+    expect(r.criticalTrigger).toBe('stoneLoose');
+    expect(r.overall).toBeLessThanOrEqual(CRITICAL_BCI_CAP);
+  });
+
   it('极端堆叠缺陷 → 主要部件坍塌拖累整桥到 15,五类(危桥)', () => {
     const many: BciFinding[] = Array.from({ length: 30 }, () => ({
       type: 'bearingVoid' as const,

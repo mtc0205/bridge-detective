@@ -122,6 +122,24 @@ describe('serializeLevel 序列化(关卡编辑器保存格式)', () => {
       expect(level.hotspots[0]?.answer.type).toBe(t);
     }
   });
+
+  it('epilogue 尾声与 asset.glb 字段:可解析、可序列化 round-trip', () => {
+    const level = parseLevel({
+      ...minimal,
+      epilogue: '尾声文案:此桥必复。',
+      asset: { glb: '/assets/levels/demo.glb' },
+    });
+    expect(level.epilogue).toBe('尾声文案:此桥必复。');
+    expect(level.asset?.glb).toBe('/assets/levels/demo.glb');
+    const again = parseLevel(JSON.parse(JSON.stringify(serializeLevel(level))));
+    expect(again.epilogue).toBe(level.epilogue);
+    expect(again.asset).toEqual(level.asset);
+  });
+
+  it('epilogue 为空串 / asset.glb 缺失 → 报错', () => {
+    expect(() => parseLevel({ ...minimal, epilogue: '' })).toThrow(/epilogue/);
+    expect(() => parseLevel({ ...minimal, asset: {} })).toThrow(/asset\.glb/);
+  });
 });
 
 describe('教学关 tutorial-viaduct.json 数据契约(M1 布点)', () => {

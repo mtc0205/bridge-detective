@@ -117,6 +117,11 @@ export interface LevelData {
   subtitle: string;
   /** 案情简介(开场卡) */
   brief: string;
+  /**
+   * 尾声文案(可选,结算页「尾声」卡):旗舰案件的历史后日谈,
+   * 如钱塘江大桥「1948 修复报道 / 1953 全面修复 / 今日服役」。
+   */
+  epilogue?: string;
   /** 时限(秒) */
   timeLimitSec: number;
   spawn: SpawnPointData;
@@ -127,6 +132,11 @@ export interface LevelData {
    * 校验保证所有非诱饵热点的答案类型都在此范围内(否则玩家无法判对)。
    */
   defectTypes?: DefectType[];
+  /**
+   * 视觉资产覆盖(可选,M2 Lux3D):glb 就位后由 gltf 覆盖工厂替换视觉子树,
+   * 碰撞 / 出生点 / 检测动线仍用程序化常量(glb 与程序骨架同一坐标系)。
+   */
+  asset?: { glb: string };
 }
 
 /** 关卡 JSON 校验失败时抛出,信息面向关卡编辑器作者。 */
@@ -259,11 +269,17 @@ export function parseLevel(raw: unknown): LevelData {
   }
 
   const spawnRaw = asRecord(root.spawn, 'spawn');
+  const epilogue = root.epilogue !== undefined ? asString(root.epilogue, 'epilogue') : undefined;
+  const asset =
+    root.asset !== undefined
+      ? { glb: asString(asRecord(root.asset, 'asset').glb, 'asset.glb') }
+      : undefined;
   return {
     id: asString(root.id, 'id'),
     caseName: asString(root.caseName, 'caseName'),
     subtitle: asString(root.subtitle, 'subtitle'),
     brief: asString(root.brief, 'brief'),
+    epilogue,
     timeLimitSec: asNumber(root.timeLimitSec, 'timeLimitSec'),
     spawn: {
       position: asVec3(spawnRaw.position, 'spawn.position'),
@@ -271,6 +287,7 @@ export function parseLevel(raw: unknown): LevelData {
     },
     hotspots,
     defectTypes,
+    asset,
   };
 }
 
@@ -308,6 +325,8 @@ export function serializeLevel(level: LevelData): Record<string, unknown> {
     },
     hotspots,
   };
+  if (level.epilogue) out.epilogue = level.epilogue;
   if (level.defectTypes) out.defectTypes = [...level.defectTypes];
+  if (level.asset) out.asset = { glb: level.asset.glb };
   return out;
 }

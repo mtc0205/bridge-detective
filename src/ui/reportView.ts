@@ -127,7 +127,7 @@ function buildSheet(stats: ReportStats, forPrint: boolean): HTMLElement {
   conclusion.append(overall);
   if (stats.criticalTrigger) {
     const crit = el('p', 'report-critical');
-    crit.textContent = '⚠ 触发关键安全隐患条款:重级「支座脱空 / 构件断裂」直接压低评定(BCI 上限 57,四类·不合格)。';
+    crit.textContent = '⚠ 触发关键安全隐患条款:重级「支座脱空 / 构件断裂 / 拱圈砌石松动」直接压低评定(BCI 上限 57,四类·不合格)。';
     conclusion.append(crit);
   }
   const gradeLine = el('p');
