@@ -67,6 +67,7 @@ export class SettlementView {
   private readonly missedListEl: HTMLElement;
   private readonly reportBtn: HTMLButtonElement;
   private readonly replayBtn: HTMLButtonElement;
+  private readonly epilogueOverlay: HTMLElement;
 
   private readonly callbacks: SettlementCallbacks;
 
@@ -137,6 +138,9 @@ export class SettlementView {
     this.reportBtn.addEventListener('click', () => this.callbacks.onShowReport());
     this.replayBtn = el('button', 'btn') as HTMLButtonElement;
     this.replayBtn.textContent = '漏检回放';
+    const epilogueBtn = el('button', 'btn') as HTMLButtonElement;
+    epilogueBtn.textContent = '尾声 · 此桥必复';
+    epilogueBtn.classList.add('hidden');
     const restartBtn = el('button', 'btn') as HTMLButtonElement;
     restartBtn.textContent = '再测一次';
     restartBtn.addEventListener('click', () => {
@@ -149,12 +153,39 @@ export class SettlementView {
       this.hide();
       callbacks.onExit();
     });
-    actions.append(this.reportBtn, this.replayBtn, restartBtn, exitBtn);
+    actions.append(this.reportBtn, this.replayBtn, epilogueBtn, restartBtn, exitBtn);
+
+    // 尾声卡(旗舰案件的历史后日谈;由 Game 注入文案)
+    this.epilogueOverlay = el('div', 'epilogue-backdrop hidden');
+    this.epilogueOverlay.addEventListener('click', (e) => {
+      if (e.target === this.epilogueOverlay) this.epilogueOverlay.classList.add('hidden');
+    });
+    const epiCard = el('div', 'epilogue-card');
+    const epiTag = el('span', 'epilogue-tag', 'EPILOGUE · 尾声');
+    const epiTitle = el('h2', '', '此桥必复');
+    const epiText = el('p', 'epilogue-text');
+    const epiClose = el('button', 'btn primary') as HTMLButtonElement;
+    epiClose.textContent = '合上档案';
+    epiClose.addEventListener('click', () => this.epilogueOverlay.classList.add('hidden'));
+    epiCard.append(epiTag, epiTitle, epiText, epiClose);
+    this.epilogueOverlay.append(epiCard);
+    epilogueBtn.addEventListener('click', () => this.epilogueOverlay.classList.remove('hidden'));
+    this.epilogueTextEl = epiText;
+    this.epilogueBtn = epilogueBtn;
 
     header.append(titleBox);
     panel.append(header, gradeBox, compBox, this.criticalEl, stats, missedBox, actions);
     this.backdrop.append(panel);
-    parent.append(this.backdrop);
+    parent.append(this.backdrop, this.epilogueOverlay);
+  }
+
+  private readonly epilogueTextEl: HTMLElement;
+  private readonly epilogueBtn: HTMLButtonElement;
+
+  /** 注入尾声文案(无则隐藏按钮;教学关 / 案件二不显示)。 */
+  setEpilogue(text: string | null): void {
+    this.epilogueTextEl.textContent = text ?? '';
+    this.epilogueBtn.classList.toggle('hidden', !text);
   }
 
   /** 设置漏检回放回调(Game 注入;无漏检时按钮隐藏)。 */

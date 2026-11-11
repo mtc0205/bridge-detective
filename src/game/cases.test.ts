@@ -25,15 +25,17 @@ function truthFindings(level: LevelData): BciFinding[] {
 }
 
 describe('案件注册表(M2)', () => {
-  it('教学关与案件二可玩,未知 id 兜底 null', () => {
+  it('三案件全部可玩(M2 解锁完成),未知 id 兜底 null', () => {
     expect(findPlayableCase('tutorial-viaduct')).not.toBeNull();
     expect(findPlayableCase('stone-arch')).not.toBeNull();
+    expect(findPlayableCase('qiantang-1937')).not.toBeNull();
     expect(findPlayableCase('not-exist')).toBeNull();
   });
 
   it.each([
     ['tutorial-viaduct', 8, 4],
     ['stone-arch', 8, 5],
+    ['qiantang-1937', 10, 4],
   ])('案件 %s:热点 ≥ %d、缺陷类型 ≥ %d、三部件有布点、含诱饵、时限合理', (id, minHotspots, minTypes) => {
     const level = findPlayableCase(id as string)!.loadLevel!();
     expect(level.hotspots.length).toBeGreaterThanOrEqual(minHotspots);
@@ -90,5 +92,32 @@ describe('案件注册表(M2)', () => {
     expect(r.criticalTrigger).toBe('stoneLoose');
     expect(r.overall).toBeLessThan(66);
     expect(bciToGrade(r.overall)).toBe(4);
+  });
+
+  it('旗舰案件尾声卡:史实核对稿口径(SOURCES.md)', () => {
+    const level = findPlayableCase('qiantang-1937')!.loadLevel!();
+    expect(level.epilogue).toBeTruthy();
+    expect(level.epilogue ?? '').toContain('1937');
+    expect(level.epilogue ?? '').toContain('1948'); // 《大公报》修复报道
+    expect(level.epilogue ?? '').toContain('1953'); // 全面修复完成
+    expect(level.epilogue ?? '').toContain('此桥必复');
+  });
+
+  it('旗舰案件开场卡:89 天自毁 / 五孔落江两墩毁 / 不虚构史实', () => {
+    const level = findPlayableCase('qiantang-1937')!.loadLevel!();
+    expect(level.brief).toContain('89');
+    expect(level.brief).toContain('五孔');
+    expect(level.brief).toContain('两座桥墩');
+    expect(level.brief).toContain('简化占位'); // 明示场景为占位简化
+  });
+
+  it('旗舰案件全缺陷计入 → 关键条款(断杆/支座)齐触发 + 上部坍塌,五类(危桥叙事)', () => {
+    const level = findPlayableCase('qiantang-1937')!.loadLevel!();
+    const r = computeBci(truthFindings(level));
+    // 本案断杆与支座卡死(重)并存,条款按规则序报告首个命中
+    expect(['bearingVoid', 'memberFracture']).toContain(r.criticalTrigger);
+    expect(r.superstructure).toBe(0); // 两处断杆 + 失铆 + 弯杆 → 上部坍塌
+    expect(r.overall).toBeLessThan(50);
+    expect(bciToGrade(r.overall)).toBe(5);
   });
 });

@@ -1,0 +1,125 @@
+{
+  "id": "qiantang-1937",
+  "caseName": "钱塘江大桥 1937·桥殇",
+  "subtitle": "双层公铁两用华伦式铆接钢桁梁桥 · 战损应急评估",
+  "brief": "1937 年 12 月 23 日,为阻断日军,建成通车仅 89 天的钱塘江大桥自毁:五孔钢梁折断落江,两座桥墩被毁。总设计师茅以升立誓——「抗战必胜,此桥必复」。你随抢修队登上未爆毁的西岸两孔,为战后复桥做战损评估:查断杆、失铆、弯杆与支座位移,回答一个问题——此桥可复吗?(场景为教学简化占位:以两孔落江、两座墩毁示意史实记载的五孔落江;史实细节以史料为准。)",
+  "epilogue": "检测评估:五类·危险,现状不可通行——但这不是这座桥的结局。1948 年 2 月 28 日,《大公报》报道钱塘江大桥修复工程;1953 年,大桥全面修复完成。今天,这座 1937 年 9 月 26 日建成通车、由茅以升主持设计的中国人自行设计建造的第一座现代化公铁两用特大桥仍在服役,是全国重点文物保护单位。「抗战必胜,此桥必复」——一语成谶。",
+  "timeLimitSec": 300,
+  "defectTypes": ["memberFracture", "rivetMissing", "buckling", "corrosion", "bearingVoid", "other"],
+  "spawn": {
+    "position": [-58, 7, 0],
+    "yawDeg": -90
+  },
+  "hotspots": [
+    {
+      "id": "corr-rail",
+      "label": "西台检修道栏杆",
+      "position": [-48, 7.75, 3.1],
+      "component": "deck",
+      "answer": { "type": "corrosion", "severity": "light" },
+      "description": "检修道栏杆与扶手表面浮锈,涂层粉化褪色,锈层未起皮、无截面削弱;常年江风盐雾所致。",
+      "normNote": "JTG/T H21-2011 附属设施:表面浮锈判「轻」,除锈补涂即可。(简化)"
+    },
+    {
+      "id": "rivet-single",
+      "label": "第一孔西侧节点板",
+      "position": [-44, 7.5, -3.4],
+      "component": "superstructure",
+      "answer": { "type": "rivetMissing", "severity": "light" },
+      "description": "节点板一角单颗铆钉缺失,钉孔边缘平整无撕裂;周边钉群敲击声音密实,节点无松动错位。",
+      "normNote": "JTG/T H21-2011(钢结构简化):单颗铆钉缺失/松动判「轻」,登记补铆(可用高强度螺栓替代)。(简化)"
+    },
+    {
+      "id": "corr-chord",
+      "label": "第一孔下弦东段",
+      "position": [-30, 6.9, -3.4],
+      "component": "superstructure",
+      "answer": { "type": "corrosion", "severity": "medium" },
+      "description": "下弦杆下翼侧面层状锈蚀起皮,敲击锈皮剥落,估测截面削弱 3%~5%;位于常被浪溅淋湿的背风面,发展较快。",
+      "normNote": "JTG/T H21-2011(钢结构简化):层状锈蚀起皮、截面轻微削弱判「中」,喷砂除锈重涂并测厚记录。(简化)"
+    },
+    {
+      "id": "rivet-node",
+      "label": "第二孔中部节点",
+      "position": [-28.5, 9.2, 3.4],
+      "component": "superstructure",
+      "answer": { "type": "rivetMissing", "severity": "severe" },
+      "description": "同一节点板连续 4 颗铆钉缺失、2 颗松动(锤击哑声、钉头微动),板边已有 1mm 级滑移擦痕——节点连接承载力已受损。",
+      "normNote": "JTG/T H21-2011(钢结构简化):同一节点 ≥3 颗铆钉缺失/松动判「重」,节点加固(增设拼接板/补铆)并复算。(简化)"
+    },
+    {
+      "id": "buckling-vert",
+      "label": "第二孔北面立柱",
+      "position": [-24.5, 10.3, -3.4],
+      "component": "superstructure",
+      "answer": { "type": "buckling", "severity": "severe" },
+      "description": "桁面立柱目视可见弯曲(矢高约 6cm,呈 S 形),弯曲段漆膜环状开裂;相邻斜杆内力已重分布,属压杆失稳前兆。",
+      "normNote": "JTG/T H21-2011(钢结构简化):目视可见弯曲变形判「重」,限载并更换或增设辅杆卸载。(简化)"
+    },
+    {
+      "id": "decoy-bent",
+      "label": "第二孔上弦竖杆(远观)",
+      "position": [-26, 11.5, 3.4],
+      "component": "superstructure",
+      "answer": { "type": "none", "severity": "none" },
+      "description": "上弦端竖杆从下层仰视「疑似弯曲」;换位对准后杆棱笔直——是相邻斜杆投影与暮光阴影造成的视差。敲击声音清脆,漆膜完好。",
+      "normNote": "结构完好:视差与阴影不是弯曲——检测要「换位复核」,不确定就不标。(教学提示)"
+    },
+    {
+      "id": "deck-break",
+      "label": "断口西邻铁路面",
+      "position": [-18, 7.2, 0.5],
+      "component": "deck",
+      "answer": { "type": "other", "severity": "severe" },
+      "description": "断口西邻 3 根枕木缺失、道砟塌落,钢轨悬空下垂约 20cm,轨端扭伤;该段桥面已丧失行车条件,人员通行需踩桁架下弦节点板。",
+      "normNote": "JTG/T H21-2011 桥面系:钢轨悬空、枕木缺失影响行车安全判「重」,禁止通行并抢修恢复。(简化)"
+    },
+    {
+      "id": "frac-diag",
+      "label": "第二孔断口端斜杆",
+      "position": [-18.2, 7.6, -3.4],
+      "component": "superstructure",
+      "answer": { "type": "memberFracture", "severity": "severe" },
+      "description": "断口端斜杆自爆炸面整齐断裂,上下残段各存约三分之一,断口颈缩明显;残余杆段下垂,随时可能坠落——这是落梁前的关键断口。",
+      "normNote": "JTG/T H21-2011(钢结构简化):主要受力构件断裂判「重」,危及整体安全,立即封闭交通并验算体系。(简化)"
+    },
+    {
+      "id": "pier2-top",
+      "label": "2号墩墩顶",
+      "position": [-16, 6.3, 0.5],
+      "component": "substructure",
+      "answer": { "type": "other", "severity": "severe" },
+      "description": "2 号墩墩顶被炸毁:墩帽缺失,残块歪斜堆叠,钢筋外露弯折,断面烧蚀发黑;墩身中下部仍完整,基础未见倾斜——具备复桥时的接高利用条件。",
+      "normNote": "JTG/T H21-2011 下部结构·墩台:墩顶毁损丧失支承判「重」;战损评估要点是墩身与基础可利用性。(简化)"
+    },
+    {
+      "id": "bearing-jam",
+      "label": "2号墩残存支座",
+      "position": [-16.3, 6.55, -2.2],
+      "component": "substructure",
+      "answer": { "type": "bearingVoid", "severity": "severe" },
+      "description": "残存的活动支座歪斜约 25°,锚栓剪断,上摆与下摆卡死;相邻梁端已错位——落梁风险点,余震或洪水扰动下残跨可能继续滑移坠落。",
+      "normNote": "JTG/T H21-2011:支座失效/脱空属直接安全隐患判「重」,应限载并尽快更换支座。(简化)"
+    },
+    {
+      "id": "wreck-fracs",
+      "label": "落江孔残骸(远观)",
+      "position": [-8.5, 1.9, 1.2],
+      "interactRadius": 14,
+      "component": "superstructure",
+      "answer": { "type": "memberFracture", "severity": "severe" },
+      "description": "落江的一孔桁架斜插江中,顶弦翘出水面:多根杆件断裂、节点板撕裂,杆段随潮水晃动;残骸大部分没入水中,需潜水摸探才能完整清点——这正是 1948 年修复时的第一道工序。",
+      "normNote": "JTG/T H21-2011(钢结构简化):整孔落梁、多杆断裂判「重」;战损记录为修复设计提供打捞与换梁清单。(简化)"
+    },
+    {
+      "id": "pier3-top",
+      "label": "3号墩残顶(远观)",
+      "position": [2, 4.1, 0],
+      "interactRadius": 18,
+      "component": "substructure",
+      "answer": { "type": "other", "severity": "severe" },
+      "description": "3 号墩仅存下部墩身,残顶面参差,烧蚀与水线痕迹分明;与 2 号墩同为被毁的两座桥墩之一。隔着落江残骸远观记录——墩身轮廓尚直,是「此桥必复」的底气。",
+      "normNote": "JTG/T H21-2011 下部结构·墩台:墩顶毁损判「重」;史实核对:1937 年自毁致两座桥墩被毁、五孔钢梁落江。(简化)"
+    }
+  ]
+}

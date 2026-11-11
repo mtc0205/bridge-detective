@@ -1,8 +1,7 @@
 /**
  * 案件注册表(数据驱动案件选择页)。
  *
- * 案件一 / 二已上架;案件三(旗舰)M2 当晚解锁:补关卡 JSON + 钢桁架资产工厂即可,
- * 注册表与案件选择页、入口装配逻辑不用再改。
+ * 三案件全部可玩:教学关(箱梁)/ 案件二(石拱)/ 旗舰案件三(钱塘江 1937 钢桁架)。
  * 所有工厂统一经 withLux3dVisuals 包装:关卡 JSON 写 asset.glb 即热切换 Lux3D 视觉,
  * 无该字段或加载失败则保持程序化占位资产。
  */
@@ -12,9 +11,11 @@ import type { DefectType, LevelData } from './level';
 import type { LevelAssetFactory } from '../bridge/levelAsset';
 import { createBoxGirderAsset } from '../bridge/boxGirder';
 import { createStoneArchAsset } from '../bridge/stoneArch';
+import { createSteelTrussAsset } from '../bridge/steelTruss';
 import { withLux3dVisuals } from '../bridge/gltfAsset';
 import tutorialViaduct from '../levels/tutorial-viaduct.json';
 import stoneArchEmergency from '../levels/stone-arch-emergency.json';
+import qiantang1937 from '../levels/qiantang-1937-bridge.json';
 
 export interface CaseDef {
   id: string;
@@ -57,13 +58,13 @@ export const CASES: CaseDef[] = [
   },
   {
     id: 'qiantang-1937',
-    tag: 'M2 解锁 · 旗舰',
+    tag: '旗舰 · 战损检测',
     name: '钱塘江大桥 1937 · 桥殇',
-    meta: '旗舰案件 · 战损检测 · Lux3D 复原',
-    desc: '由历史照片复原通车 89 天即自毁阻敌的双层公铁两用钢桁梁桥:断杆、失铆、构件弯曲,评估可修复性,续写「抗战必胜,此桥必复」。',
-    locked: true,
-    lockedNote: '即将解锁 · 今晚钢桁架占位就位',
-    plannedTypes: ['memberFracture', 'rivetMissing', 'buckling', 'corrosion', 'other'],
+    meta: '12 个检测点 · 5 分钟 · 6 类缺陷',
+    desc: '1937 年 12 月 23 日,通车 89 天的大桥自毁阻敌:五孔落江、两墩被毁。登桥评估断杆、失铆、弯杆与支座卡死,回答「此桥可复吗」——含史实尾声卡。',
+    locked: false,
+    loadLevel: () => parseLevel(qiantang1937),
+    assetFactory: withLux3dVisuals(createSteelTrussAsset),
   },
 ];
 

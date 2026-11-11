@@ -111,6 +111,7 @@ export class Game {
         if (this.lastStats) this.report.show(this.buildReportStats());
       },
     });
+    this.settlement.setEpilogue(level.epilogue ?? null);
     this.codex = new CodexView(this.host);
     this.codex.onClose = () => this.onCodexClosed();
     this.report = new ReportView(this.host, () => this.report.hide());
