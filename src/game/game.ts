@@ -25,6 +25,7 @@ import type { SettlementStats } from '../ui/settlement';
 import { CodexView } from '../ui/codexView';
 import { ReportView } from '../ui/reportView';
 import type { ReportStats } from '../ui/reportView';
+import { Sfx } from '../audio/sfx';
 
 export interface GameHooks {
   /** 返回案件选择页 */
@@ -50,6 +51,7 @@ export class Game {
   private readonly codex: CodexView;
   private readonly report: ReportView;
   private readonly session: Session;
+  private readonly sfx = new Sfx();
   private readonly canvas: HTMLCanvasElement;
   private readonly clock = new THREE.Clock();
   private readonly startOverlay: HTMLElement;
@@ -180,9 +182,14 @@ export class Game {
     if (e.code === 'KeyG' && !e.repeat && this.state === 'playing') {
       this.openCodex('playing');
     }
+    if (e.code === 'KeyM' && !e.repeat) {
+      const muted = this.sfx.toggleMute();
+      this.hud.toast(muted ? '音效:关(M 再开)' : '音效:开', 'info');
+    }
   };
 
   private async openInspect(hotspot: HotspotData): Promise<void> {
+    this.sfx.open();
     this.state = 'dialog';
     this.controller.enabled = false;
     this.hud.setPrompt(null);
@@ -197,6 +204,8 @@ export class Game {
       this.hud.setProgress(this.session.resolvedCount, this.level.hotspots.length);
       const ok = resolution.judgment.scoreDelta > 0;
       this.hud.toast(`${resolution.judgment.heading} ${resolution.judgment.scoreDelta >= 0 ? '+' : ''}${resolution.judgment.scoreDelta}`, ok ? 'good' : 'bad');
+      if (ok) this.sfx.good();
+      else this.sfx.bad();
 
       const feedback: DialogFeedback = {
         ok: resolution.judgment.kind === 'correct' || resolution.judgment.kind === 'decoyPass',
@@ -296,6 +305,7 @@ export class Game {
     this.lastStats = stats;
     this.settlement.setReplayHandler(stats.missed.length > 0 ? () => this.enterReplay() : null);
     this.settlement.show(stats);
+    this.sfx.settle();
   }
 
   // —————————————————————— 漏检回放 ——————————————————————
@@ -442,7 +452,8 @@ export class Game {
     controls.className = 'start-controls';
     controls.innerHTML =
       '<span><b>WASD</b> 移动</span><span><b>鼠标</b> 视角</span><span><b>E</b> 检测</span>' +
-      '<span><b>G</b> 判定图鉴</span><span><b>Shift</b> 加速</span><span><b>Esc</b> 暂停 / 释放指针</span>';
+      '<span><b>G</b> 判定图鉴</span><span><b>M</b> 音效开关</span><span><b>Shift</b> 加速</span>' +
+      '<span><b>Esc</b> 暂停 / 释放指针</span>';
     const tip = document.createElement('p');
     tip.className = 'start-tip';
     tip.textContent = '路线提示:沿桥面从西端走到东端下路堤,再从桥南侧绕到桥下便道,仰头检查梁体与支座。';
@@ -451,6 +462,7 @@ export class Game {
     enterBtn.textContent = '进入检测现场';
     enterBtn.addEventListener('click', () => {
       this.startOverlay.classList.add('hidden');
+      this.sfx.startWind(); // 用户手势后起环境风
       this.requestLock();
       // 指针锁定失败时由 onPointerLockError/兜底逻辑显示暂停层
       window.setTimeout(() => {
@@ -540,6 +552,7 @@ export class Game {
     this.codex.dispose();
     this.report.dispose();
     this.settlement.dispose();
+    this.sfx.dispose();
     this.startOverlay.remove();
     this.pauseOverlay.remove();
     this.replayBar.remove();

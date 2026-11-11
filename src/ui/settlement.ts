@@ -49,6 +49,7 @@ function el(tag: string, className = '', text = ''): HTMLElement {
 
 export class SettlementView {
   private readonly backdrop: HTMLElement;
+  private readonly panelEl: HTMLElement;
   private readonly reasonEl: HTMLElement;
   private readonly gradeNumEl: HTMLElement;
   private readonly gradeTextEl: HTMLElement;
@@ -74,6 +75,7 @@ export class SettlementView {
     this.backdrop = el('div', 'settlement-backdrop hidden');
 
     const panel = el('div', 'settlement-panel');
+    this.panelEl = panel;
 
     const header = el('header', 'settlement-header');
     const titleBox = el('div');
@@ -167,7 +169,11 @@ export class SettlementView {
     this.gradeNumEl.textContent = String(stats.grade);
     this.gradeTextEl.textContent = GRADE_LABELS[stats.grade];
     this.gradeNumEl.dataset.grade = String(stats.grade);
-    this.bciEl.textContent = stats.bci.toFixed(1);
+    this.animateBci(stats.bci);
+    // 结算入场动画(雏形):重置 class 强制重播 CSS 关键帧
+    this.panelEl.classList.remove('animate');
+    void this.panelEl.offsetWidth; // 强制 reflow
+    this.panelEl.classList.add('animate');
     this.compDeck.textContent = stats.componentBci.deck.toFixed(1);
     this.compSup.textContent = stats.componentBci.superstructure.toFixed(1);
     this.compSub.textContent = stats.componentBci.substructure.toFixed(1);
@@ -200,6 +206,20 @@ export class SettlementView {
 
   hide(): void {
     this.backdrop.classList.add('hidden');
+  }
+
+  /** BCI 数字滚动(从 100 评到实际值,先抑后扬的「翻账」感)。 */
+  private animateBci(target: number): void {
+    const startVal = 100;
+    const durationMs = 900;
+    const t0 = performance.now();
+    const step = (now: number): void => {
+      const k = Math.min(1, (now - t0) / durationMs);
+      const eased = 1 - Math.pow(1 - k, 3);
+      this.bciEl.textContent = (startVal + (target - startVal) * eased).toFixed(1);
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
 
   dispose(): void {
