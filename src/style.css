@@ -1082,6 +1082,14 @@ body {
   cursor: ew-resize;
 }
 
+.measure-scale-mark {
+  position: absolute;
+  top: 6px;
+  width: 1px;
+  height: 18px;
+  background: rgba(142, 163, 181, 0.75);
+}
+
 .measure-scale-ticks {
   display: flex;
   justify-content: space-between;

@@ -130,6 +130,11 @@ export class SettlementView {
     const missedTitle = el('span', 'missed-title', '漏检清单(可回放定位)');
     this.missedListEl = el('div', 'missed-list');
     missedBox.append(missedTitle, this.missedListEl);
+    const hint = el(
+      'p',
+      'settlement-hint',
+      '提示:「查看检测报告」可下载 Markdown 或打印另存 PDF;有漏检时可用「漏检回放」进场景逐处定位,再测一次冲击全对。',
+    );
 
     // 操作
     const actions = el('div', 'settlement-actions');
@@ -174,7 +179,7 @@ export class SettlementView {
     this.epilogueBtn = epilogueBtn;
 
     header.append(titleBox);
-    panel.append(header, gradeBox, compBox, this.criticalEl, stats, missedBox, actions);
+    panel.append(header, gradeBox, compBox, this.criticalEl, stats, missedBox, hint, actions);
     this.backdrop.append(panel);
     parent.append(this.backdrop, this.epilogueOverlay);
   }

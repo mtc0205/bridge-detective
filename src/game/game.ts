@@ -67,6 +67,9 @@ export class Game {
   private readonly pauseOverlay: HTMLElement;
   private readonly replayBar: HTMLElement;
   private readonly replayLabelEl: HTMLElement;
+  private readonly guideEl: HTMLElement;
+  /** 首次近热点引导(浏览器本地记一次,非打断式) */
+  private guideDone: boolean;
 
   private state: GameState = 'ready';
   private elapsed = 0;
@@ -136,12 +139,14 @@ export class Game {
     this.codex.onClose = () => this.onCodexClosed();
     this.report = new ReportView(this.host, () => this.report.hide());
 
-    // —— 开场卡 / 暂停层 / 回放条 ——
+    // —— 开场卡 / 暂停层 / 回放条 / 首次引导 ——
     this.startOverlay = this.buildStartOverlay();
     this.pauseOverlay = this.buildPauseOverlay();
     const bar = this.buildReplayBar();
     this.replayBar = bar.root;
     this.replayLabelEl = bar.label;
+    this.guideEl = this.buildGuideTip();
+    this.guideDone = Game.guideFlagRead();
 
     // —— 事件 ——
     window.addEventListener('resize', this.onResize);
@@ -171,6 +176,7 @@ export class Game {
         this.activeHotspot = aimed;
         this.hud.setAim(aimed !== null);
         this.hud.setPrompt(aimed ? `E · 检测:${aimed.label}` : null);
+        if (aimed && !this.guideDone) this.showGuideOnce();
 
         this.session.tick(dt);
         this.hud.setTime(this.session.timeLeft, this.level.timeLimitSec);
@@ -191,6 +197,11 @@ export class Game {
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     if (this.disposed) return;
+    // 音效开关在所有状态生效(含弹窗 / 图鉴 / 回放)
+    if (e.code === 'KeyM' && !e.repeat) {
+      const muted = this.sfx.toggleMute();
+      this.hud.toast(muted ? '音效:关(M 再开)' : '音效:开', 'info');
+    }
     if (this.state === 'replay') {
       if (e.code === 'KeyN' && !e.repeat) this.replayStep(1);
       else if (e.code === 'KeyP' && !e.repeat) this.replayStep(-1);
@@ -204,14 +215,11 @@ export class Game {
     if (e.code === 'KeyG' && !e.repeat && this.state === 'playing') {
       this.openCodex('playing');
     }
-    if (e.code === 'KeyM' && !e.repeat) {
-      const muted = this.sfx.toggleMute();
-      this.hud.toast(muted ? '音效:关(M 再开)' : '音效:开', 'info');
-    }
   };
 
   private async openInspect(hotspot: HotspotData): Promise<void> {
     this.sfx.open();
+    this.guideEl.classList.remove('show'); // 首次引导见到 E 生效即收起
     this.state = 'dialog';
     this.controller.enabled = false;
     this.hud.setPrompt(null);
@@ -555,9 +563,63 @@ export class Game {
     return overlay;
   }
 
+  /** 首次近热点的非打断式引导条(按键链,一次即不再出现)。 */
+  private buildGuideTip(): HTMLElement {
+    const tip = document.createElement('div');
+    tip.className = 'guide-tip';
+    const steps: [string, string][] = [
+      ['WASD', '走近微光标记'],
+      ['E', '打开近景检测'],
+      ['类型 + 轻中重', '选判定'],
+      ['Enter', '提交 · G 图鉴'],
+    ];
+    steps.forEach(([key, label], i) => {
+      if (i > 0) {
+        const arrow = document.createElement('span');
+        arrow.className = 'guide-arrow';
+        arrow.textContent = '→';
+        tip.append(arrow);
+      }
+      const box = document.createElement('span');
+      box.className = 'guide-step';
+      const k = document.createElement('b');
+      k.textContent = key;
+      const l = document.createElement('span');
+      l.textContent = label;
+      box.append(k, l);
+      tip.append(box);
+    });
+    this.host.append(tip);
+    return tip;
+  }
+
+  private showGuideOnce(): void {
+    this.guideDone = true;
+    Game.guideFlagWrite();
+    this.guideEl.classList.add('show');
+    window.setTimeout(() => {
+      if (!this.disposed) this.guideEl.classList.remove('show');
+    }, 10000);
+  }
+
+  private static guideFlagRead(): boolean {
+    try {
+      return window.localStorage.getItem('bd-guide-v1') !== null;
+    } catch {
+      return false; // 隐私模式:降级为每局一次
+    }
+  }
+
+  private static guideFlagWrite(): void {
+    try {
+      window.localStorage.setItem('bd-guide-v1', '1');
+    } catch {
+      /* 忽略 */
+    }
+  }
+
   /** 漏检回放底部切换条(N/P 键与按钮等价)。 */
-  private buildReplayBar(): { root: HTMLElement; label: HTMLElement } {
-    const bar = document.createElement('div');
+  private buildReplayBar(): { root: HTMLElement; label: HTMLElement } {    const bar = document.createElement('div');
     bar.className = 'replay-bar hidden';
     const prevBtn = document.createElement('button');
     prevBtn.className = 'btn small';
@@ -611,6 +673,7 @@ export class Game {
     this.pauseOverlay.remove();
     this.replayBar.remove();
     this.duskOverlay.remove();
+    this.guideEl.remove();
     for (const child of [...this.scene.children]) this.scene.remove(child);
     this.renderer.dispose();
     this.canvas.remove();

@@ -6,13 +6,24 @@
  *   open(hotspot) → 玩家选择 → resolve(InspectChoice | null)
  *   showFeedback(...) → 展示判定结果(正确/误报 + 规范依据)→「收起」→ closed Promise 结束
  *
- * 快捷键:数字 1-9 选类型、Q/W/E 选严重度、Enter 提交、Esc 取消;
- * 「图鉴」按钮 / G 键打开判定图鉴(由 Game 注入回调,计时保持暂停)。
+ * 快捷键:1-9 及 Z/X/C/V/B/N// 选类型(支持 16 类全集)、Q/W/E 选严重度、
+ * Enter 提交、Esc 取消;「图鉴」/ G 打开判定图鉴;近景描述含 mm 读数时
+ * 提供「量测参考」卡尺(阈值建议,判级仍由玩家提交)。
  */
 
 import { DEFECT_TYPE_LABELS, SEVERITIES, SEVERITY_LABELS } from '../game/level';
 import type { DefectType, HotspotData, Severity } from '../game/level';
 import type { InspectChoice } from '../game/scoring';
+import { bucketAdvice, descriptionMeasurable, widthBucket } from '../game/measure';
+import { MEASURE_MIN_MM, MEASURE_MAX_MM, CRACK_REGISTER_MM, CRACK_SEVERE_MM } from '../game/measure';
+
+/** 类型快选键全集(覆盖 16 类;当前各案件范围 ≤8,后位键为全集兜底)。 */
+export const DIALOG_HOTKEYS: readonly string[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'Z', 'X', 'C', 'V', 'B', 'N', '/'];
+
+/** 第 i 个类型的快选键标签(超出表长回退空串)。 */
+export function dialogHotkey(index: number): string {
+  return DIALOG_HOTKEYS[index] ?? '';
+}
 
 export interface DialogFeedback {
   ok: boolean;
@@ -42,6 +53,12 @@ export class InspectDialog {
   private readonly cancelBtn: HTMLButtonElement;
   private readonly formWrap: HTMLElement;
   private readonly feedbackWrap: HTMLElement;
+  private readonly measureBtn: HTMLButtonElement;
+  private readonly measurePanel: HTMLElement;
+  private readonly measureValueEl: HTMLElement;
+  private readonly measureJawEl: HTMLElement;
+  private readonly measureVerdictEl: HTMLElement;
+  private readonly measureSlider: HTMLInputElement;
   private readonly fbHeading: HTMLElement;
   private readonly fbDetail: HTMLElement;
   private readonly fbNorm: HTMLElement;
@@ -96,7 +113,7 @@ export class InspectDialog {
     this.typeGrid = document.createElement('div');
     this.typeGrid.className = 'pill-grid';
     this.types.forEach((t, i) => {
-      this.typeGrid.append(this.makeRadio('dlg-type', t, DEFECT_TYPE_LABELS[t], String(i + 1)));
+      this.typeGrid.append(this.makeRadio('dlg-type', t, DEFECT_TYPE_LABELS[t], dialogHotkey(i)));
     });
     typeField.append(typeLegend, this.typeGrid);
 
@@ -127,16 +144,72 @@ export class InspectDialog {
 
     const assist = document.createElement('div');
     assist.className = 'dialog-assist';
+    this.measureBtn = document.createElement('button');
+    this.measureBtn.className = 'btn small';
+    this.measureBtn.textContent = '量测参考';
+    this.measureBtn.addEventListener('click', () => {
+      const open = this.measurePanel.classList.toggle('hidden');
+      this.measureBtn.textContent = open ? '量测参考' : '收起量测';
+    });
     this.codexBtn = document.createElement('button');
     this.codexBtn.className = 'btn small';
     this.codexBtn.textContent = '判定图鉴(G)';
     this.codexBtn.addEventListener('click', () => this.onOpenCodex());
     const hint = document.createElement('span');
     hint.className = 'dialog-assist-hint';
-    hint.textContent = `不确定就不标 —— 误报扣分 · 数字键快选类型 ${this.types.length <= 9 ? `1-${this.types.length}` : ''}`;
-    assist.append(this.codexBtn, hint);
+    hint.textContent = `不确定就不标 —— 误报扣分 · 数字键快选类型 ${this.types.length <= 9 ? `1-${this.types.length}` : '见标签'}`;
+    assist.append(this.codexBtn, this.measureBtn, hint);
 
-    this.formWrap.append(typeField, sevField, actions, assist);
+    // —— 量测参考卡尺(近景描述含 mm 读数时可用)——
+    this.measurePanel = document.createElement('div');
+    this.measurePanel.className = 'measure-panel hidden';
+    const mHead = document.createElement('div');
+    mHead.className = 'measure-head';
+    const mLabel = document.createElement('span');
+    mLabel.textContent = '裂缝宽度卡尺 · 对准描述中的读数';
+    this.measureValueEl = document.createElement('b');
+    this.measureValueEl.className = 'measure-value';
+    mHead.append(mLabel, this.measureValueEl);
+
+    const scale = document.createElement('div');
+    scale.className = 'measure-scale';
+    const track = document.createElement('div');
+    track.className = 'measure-scale-track';
+    // 固定左爪(量程起点)
+    const jawFixed = document.createElement('div');
+    jawFixed.className = 'measure-scale-jaw';
+    jawFixed.style.left = '0%';
+    this.measureJawEl = document.createElement('div');
+    this.measureJawEl.className = 'measure-scale-jaw';
+    // 登记阈值 / 重级阈值刻度线
+    const pct = (mm: number): string => `${(((mm - MEASURE_MIN_MM) / (MEASURE_MAX_MM - MEASURE_MIN_MM)) * 100).toFixed(1)}%`;
+    const markReg = document.createElement('div');
+    markReg.className = 'measure-scale-mark';
+    markReg.style.left = pct(CRACK_REGISTER_MM);
+    const markSev = document.createElement('div');
+    markSev.className = 'measure-scale-mark';
+    markSev.style.left = pct(CRACK_SEVERE_MM);
+    this.measureSlider = document.createElement('input');
+    this.measureSlider.type = 'range';
+    this.measureSlider.min = String(MEASURE_MIN_MM);
+    this.measureSlider.max = String(MEASURE_MAX_MM);
+    this.measureSlider.step = '0.01';
+    this.measureSlider.value = '0.2';
+    this.measureSlider.addEventListener('input', () => this.refreshMeasure());
+    scale.append(track, jawFixed, markReg, markSev, this.measureJawEl, this.measureSlider);
+
+    const ticks = document.createElement('div');
+    ticks.className = 'measure-scale-ticks';
+    for (const t of ['0.05', `0.2 登记`, `0.3 重`, '0.6']) {
+      const tick = document.createElement('span');
+      tick.textContent = t;
+      ticks.append(tick);
+    }
+    this.measureVerdictEl = document.createElement('p');
+    this.measureVerdictEl.className = 'measure-verdict';
+    this.measurePanel.append(mHead, scale, ticks, this.measureVerdictEl);
+
+    this.formWrap.append(typeField, sevField, actions, assist, this.measurePanel);
 
     this.feedbackWrap = document.createElement('div');
     this.feedbackWrap.className = 'dialog-feedback hidden';
@@ -174,6 +247,13 @@ export class InspectDialog {
     this.descEl.textContent = hotspot.description;
     this.resetRadios();
     this.refreshSubmitState();
+    // 量测参考:仅近景描述带 mm 读数的缺陷提供(数据驱动,不泄答案)
+    const measurable = descriptionMeasurable(hotspot.description);
+    this.measureBtn.classList.toggle('hidden', !measurable);
+    this.measurePanel.classList.add('hidden');
+    this.measureBtn.textContent = '量测参考';
+    this.measureSlider.value = '0.2';
+    this.refreshMeasure();
     this.formWrap.classList.remove('hidden');
     this.feedbackWrap.classList.add('hidden');
     this.backdrop.classList.remove('hidden');
@@ -238,6 +318,21 @@ export class InspectDialog {
     this.submitBtn.disabled = !(type && severity);
   }
 
+  /** 卡尺读数 → 左右爪位置 / 读数 / 阈值建议。 */
+  private refreshMeasure(): void {
+    const mm = Number(this.measureSlider.value);
+    const ratio = (mm - MEASURE_MIN_MM) / (MEASURE_MAX_MM - MEASURE_MIN_MM);
+    this.measureJawEl.style.left = `${(ratio * 100).toFixed(1)}%`;
+    this.measureValueEl.textContent = `${mm.toFixed(2)} mm`;
+    const bucket = widthBucket(mm);
+    this.measureVerdictEl.innerHTML = '';
+    const text = document.createElement('span');
+    if (bucket === 'severe') text.className = 'verdict-heavy';
+    else if (bucket === 'register') text.className = 'verdict-log';
+    text.textContent = bucketAdvice(bucket);
+    this.measureVerdictEl.append(text);
+  }
+
   private submitDefect(): void {
     const type = this.selectedValue('dlg-type');
     const severity = this.selectedValue('dlg-severity');
@@ -297,14 +392,15 @@ export class InspectDialog {
       return;
     }
     if (this.feedbackPhase) return;
-    // 数字键 1-9 快选缺陷类型(类型数受限时自动收敛),Q/W/E 快选严重度,Enter 提交
-    const num = Number(e.key);
-    if (Number.isInteger(num) && num >= 1 && num <= Math.min(9, this.types.length)) {
-      const input = this.typeGrid.querySelectorAll<HTMLInputElement>('input[type="radio"]')[num - 1];
+    // 类型快选(1-9 + Z/X/C/V/B/N//,覆盖 16 类全集)、Q/W/E 严重度、Enter 提交
+    const hotIndex = DIALOG_HOTKEYS.indexOf(e.key.toUpperCase());
+    if (hotIndex >= 0 && hotIndex < this.types.length) {
+      const input = this.typeGrid.querySelectorAll<HTMLInputElement>('input[type="radio"]')[hotIndex];
       if (input) {
         input.checked = true;
         this.refreshSubmitState();
       }
+      return;
     }
     const sevKeys: Record<string, number> = { q: 0, w: 1, e: 2 };
     const sevIndex = sevKeys[e.key.toLowerCase()];

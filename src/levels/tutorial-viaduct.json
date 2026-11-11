@@ -76,8 +76,8 @@
     {
       "id": "crack-transverse",
       "label": "箱梁南侧腹板",
-      "position": [33, 7.8, 4.3],
-      "interactRadius": 8,
+      "position": [33, 7.5, 4.2],
+      "interactRadius": 6.5,
       "component": "superstructure",
       "answer": { "type": "crack", "severity": "medium" },
       "description": "腹板与底板交界处横向裂缝,缝宽约 0.25mm,延伸约 40cm,缝面潮湿伴钙析,近似竖向弯曲裂缝特征。",

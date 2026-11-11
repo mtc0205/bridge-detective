@@ -190,7 +190,12 @@ export class ReportView {
 
     this.body = el('div', 'report-view-body');
     this.statusEl = el('p', 'report-view-status hidden');
-    panel.append(head, this.body, this.statusEl);
+    const note = el(
+      'p',
+      'report-view-note',
+      '提示:报告数字与检测过程同源一致;「打印 / 导出 PDF」在打印对话框选择「另存为 PDF」即可留档。',
+    );
+    panel.append(head, this.body, note, this.statusEl);
     this.backdrop.append(panel);
     parent.append(this.backdrop);
   }
