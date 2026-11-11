@@ -1,19 +1,24 @@
 /**
  * 案件注册表(数据驱动案件选择页)。
  *
- * 案件二 / 三 M2 等 Lux3D 解锁后:补一份关卡 JSON(格式与教学关一致,新缺陷类型已就位)+
- * 换对应资产工厂,即可上架——本注册表与案件选择页、入口装配逻辑不用再改。
+ * 案件一 / 二已上架;案件三(旗舰)M2 当晚解锁:补关卡 JSON + 钢桁架资产工厂即可,
+ * 注册表与案件选择页、入口装配逻辑不用再改。
+ * 所有工厂统一经 withLux3dVisuals 包装:关卡 JSON 写 asset.glb 即热切换 Lux3D 视觉,
+ * 无该字段或加载失败则保持程序化占位资产。
  */
 
 import { parseLevel } from './level';
 import type { DefectType, LevelData } from './level';
 import type { LevelAssetFactory } from '../bridge/levelAsset';
 import { createBoxGirderAsset } from '../bridge/boxGirder';
+import { createStoneArchAsset } from '../bridge/stoneArch';
+import { withLux3dVisuals } from '../bridge/gltfAsset';
 import tutorialViaduct from '../levels/tutorial-viaduct.json';
+import stoneArchEmergency from '../levels/stone-arch-emergency.json';
 
 export interface CaseDef {
   id: string;
-  /** 卡片角标(教学关 / M2 解锁) */
+  /** 卡片角标(教学关 / 案件二 / 旗舰) */
   tag: string;
   name: string;
   /** 一行元信息(检测点数 · 时限 · 病害类型) */
@@ -38,17 +43,17 @@ export const CASES: CaseDef[] = [
     desc: '三跨预应力混凝土连续箱梁桥,日常定期检测。上桥面、下便道,练习「观察 → 判定 → 定级」的完整流程,并出一份技术状况评定报告。',
     locked: false,
     loadLevel: () => parseLevel(tutorialViaduct),
-    assetFactory: createBoxGirderAsset,
+    assetFactory: withLux3dVisuals(createBoxGirderAsset),
   },
   {
     id: 'stone-arch',
-    tag: 'M2 解锁',
+    tag: '案件二 · 应急',
     name: '山村石拱桥 · 应急检测',
-    meta: '暴雨后 24 小时 · 圬工结构',
-    desc: '暴雨过后的应急排查:砌石风化、灰缝脱落、拱圈渗水、桥台冲刷,判读圬工拱桥的「带病服役」底线。',
-    locked: true,
-    lockedNote: '即将解锁 · M2(Lux3D 场景生成中)',
-    plannedTypes: ['masonryWeathering', 'mortarLoss', 'stoneLoose', 'seepage', 'scour', 'crack'],
+    meta: '10 个检测点 · 4 分钟 · 8 类缺陷',
+    desc: '暴雨过后 24 小时的应急排查:砌石风化、灰缝脱落、拱石松动、拱圈渗水、桥台冲刷,判读这座 62 岁圬工拱桥能否限载放行。',
+    locked: false,
+    loadLevel: () => parseLevel(stoneArchEmergency),
+    assetFactory: withLux3dVisuals(createStoneArchAsset),
   },
   {
     id: 'qiantang-1937',
@@ -57,7 +62,7 @@ export const CASES: CaseDef[] = [
     meta: '旗舰案件 · 战损检测 · Lux3D 复原',
     desc: '由历史照片复原通车 89 天即自毁阻敌的双层公铁两用钢桁梁桥:断杆、失铆、构件弯曲,评估可修复性,续写「抗战必胜,此桥必复」。',
     locked: true,
-    lockedNote: '即将解锁 · M2(Lux3D 资产生成中)',
+    lockedNote: '即将解锁 · 今晚钢桁架占位就位',
     plannedTypes: ['memberFracture', 'rivetMissing', 'buckling', 'corrosion', 'other'],
   },
 ];

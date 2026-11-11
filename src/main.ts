@@ -11,6 +11,8 @@ import { Game } from './game/game';
 import { findPlayableCase } from './game/cases';
 import { CaseSelectView } from './ui/caseSelect';
 import { parseLevel } from './game/level';
+import type { LevelData } from './game/level';
+import type { LevelAssetFactory } from './bridge/levelAsset';
 import { createBoxGirderAsset } from './bridge/boxGirder';
 import tutorialViaduct from './levels/tutorial-viaduct.json';
 
@@ -18,10 +20,20 @@ const hostElement = document.getElementById('app');
 if (!hostElement) throw new Error('缺少 #app 挂载点');
 const host: HTMLElement = hostElement;
 
-// —— 开发模式:关卡编辑器(?editor=1)——
+// —— 开发模式:关卡编辑器(?editor=1,可用 &level=<案件id> 选底稿关卡)——
 if (new URLSearchParams(window.location.search).has('editor')) {
   const { EditorApp } = await import('./editor/editor');
-  const editor = new EditorApp(host, parseLevel(tutorialViaduct), createBoxGirderAsset);
+  const editorLevelId = new URLSearchParams(window.location.search).get('level');
+  let baseLevel: LevelData = parseLevel(tutorialViaduct);
+  let baseFactory: LevelAssetFactory = createBoxGirderAsset;
+  if (editorLevelId) {
+    const def = findPlayableCase(editorLevelId);
+    if (def?.loadLevel && def.assetFactory) {
+      baseLevel = def.loadLevel();
+      baseFactory = def.assetFactory;
+    }
+  }
+  const editor = new EditorApp(host, baseLevel, baseFactory);
   editor.start();
 } else {
   mainMenu();

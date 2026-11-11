@@ -1,0 +1,104 @@
+{
+  "id": "stone-arch-emergency",
+  "caseName": "山村石拱桥·应急检测",
+  "subtitle": "单孔实腹式砌石拱桥 · 暴雨后应急排查",
+  "brief": "山区连夜暴雨,洪峰刚过 24 小时。这座单孔砌石拱桥(净跨 15m,矢跨比约 1/5,建成 62 年)是村里对外唯一通道,乡道站先限载、再请你应急排查:重点查桥台冲刷与拱圈稳定,判读能否限载放行。提示:过水浑急,沿河滩便道检查北立面;至少一处疑似实际完好——不确定就不标,误报扣分。按 G 查图鉴。",
+  "timeLimitSec": 240,
+  "defectTypes": ["masonryWeathering", "mortarLoss", "stoneLoose", "seepage", "scour", "crack", "other", "railingDamage"],
+  "spawn": {
+    "position": [-26, 5.5, 0],
+    "yawDeg": -90
+  },
+  "hotspots": [
+    {
+      "id": "parapet-gap",
+      "label": "北侧石护栏西段",
+      "position": [-5.3, 5.95, -2.05],
+      "component": "deck",
+      "answer": { "type": "railingDamage", "severity": "light" },
+      "description": "护栏成段酥裂缺口约 1.4m,残墩断面粗糙,碎块散落桥面;两侧未松动,行车行人有避让绕行痕迹。",
+      "normNote": "JTG/T H21-2011 附属设施·栏杆护栏:局部破损未失稳属轻度缺损,及时修复防坠落。(简化)"
+    },
+    {
+      "id": "spandrel-crack",
+      "label": "拱上侧墙东侧",
+      "position": [3.0, 4.75, -2.8],
+      "component": "superstructure",
+      "answer": { "type": "crack", "severity": "light" },
+      "description": "侧墙竖向裂缝一条,缝宽约 0.15mm、延伸 0.6m,缝缘尚硬、无错台外鼓,近似砌筑缝张开而非剪切错动。",
+      "normNote": "JTG/T H21-2011 上部结构·拱式桥:侧墙(拱上建筑)非受力裂缝 <0.2mm 登记观测即可,判「轻」。(简化)"
+    },
+    {
+      "id": "weather-arch",
+      "label": "拱圈东四分点",
+      "position": [4.5, 3.6, -2.6],
+      "component": "superstructure",
+      "answer": { "type": "masonryWeathering", "severity": "medium" },
+      "description": "拱石表面成片酥化剥落,深度约 1~2cm,锤击声发闷;四分点附近三条砌缝受风化变宽,局部露出台阶差。",
+      "normNote": "JTG/T H21-2011 上部结构·圬工拱桥:砌石风化按深度与范围分级,本例成片深度风化判「中」,需剔补。(简化)"
+    },
+    {
+      "id": "seep-arch",
+      "label": "拱圈西端下缘",
+      "position": [-6.2, 2.7, -2.6],
+      "component": "superstructure",
+      "answer": { "type": "seepage", "severity": "medium" },
+      "description": "拱腹渗水沿砌缝在拱圈立面拉出数条黄褐色钙析条带,缝内湿润带泥,近起拱线处湿斑连片——洪水退去仍在渗,说明拱背填料饱水。",
+      "normNote": "JTG/T H21-2011:持续渗水伴钙析判「中」;应查明拱背排水与防水层,评估填料饱水对拱圈的不利影响。(简化)"
+    },
+    {
+      "id": "loose-crown",
+      "label": "拱顶偏东拱石",
+      "position": [0.9, 4.6, -2.6],
+      "component": "superstructure",
+      "answer": { "type": "stoneLoose", "severity": "severe" },
+      "description": "拱顶偏东一块拱石外鼓错台约 2cm,灰缝挤碎脱落,敲击空响;相邻石受其牵引出现剪口——拱圈受力断面已受扰动,洪峰期可能进一步发展。",
+      "normNote": "JTG/T H21-2011:拱圈砌石松动/外鼓属严重缺损(可能引发拱圈失稳),应立即设临时支撑并限载,判「重」。(简化)"
+    },
+    {
+      "id": "mortar-arch",
+      "label": "拱圈西四分点砌缝",
+      "position": [-4.2, 3.7, -2.6],
+      "component": "superstructure",
+      "answer": { "type": "mortarLoss", "severity": "medium" },
+      "description": "西四分点连续四条砌缝灰浆酥化脱落,缝深 3~4cm 可探入,缝间长草;尚无砌石错动,但洪水浸泡会加速失灰。",
+      "normNote": "JTG/T H21-2011 上部结构·圬工拱桥:成段灰缝脱落判「中」,汛后应清缝重新勾缝。(简化)"
+    },
+    {
+      "id": "radial-crack",
+      "label": "拱圈西三分点",
+      "position": [-2.4, 4.2, -2.55],
+      "component": "superstructure",
+      "answer": { "type": "crack", "severity": "medium" },
+      "description": "径向裂缝沿拱石放射状砌缝发展,缝宽约 0.25mm,贯通拱圈立面 2/3,缝缘有新鲜擦痕——疑似洪峰超载引起的受力裂缝,非既有砌缝张开。",
+      "normNote": "JTG/T H21-2011:径向(放射状)受力裂缝 ≥0.2mm 需登记;未贯穿判「中」,需持续观测并验算。(简化)"
+    },
+    {
+      "id": "scour-westabut",
+      "label": "西桥台河侧基础",
+      "position": [-7.4, 0.8, -2.2],
+      "component": "substructure",
+      "answer": { "type": "scour", "severity": "severe" },
+      "description": "西桥台河侧基础局部掏空外露约 40cm,基底片石悬空,水位线处台身湿蚀槽痕明显;对岸同样水流顶冲,发展速度快。",
+      "normNote": "JTG/T H21-2011 下部结构·基础:冲刷掏空致基础外露判「重」,应抛石护基并限载,汛期加密观测。(简化)"
+    },
+    {
+      "id": "slope-collapse",
+      "label": "西岸砌石护坡",
+      "position": [-10.5, 3.0, -2.6],
+      "component": "substructure",
+      "answer": { "type": "other", "severity": "medium" },
+      "description": "西岸护坡中段约 3m 范围砌石局部坍滑,两块落石滚至便道,坡面露土被冲出细沟;护坡仍在整体挡土,未见牵引桥台。",
+      "normNote": "JTG/T H21-2011 下部结构·锥坡护坡:局部坍塌不影响桥台稳定判「中」,汛后修复并加密排水。(简化)"
+    },
+    {
+      "id": "decoy-joint-shade",
+      "label": "拱圈东下缘砌缝",
+      "position": [2.4, 4.2, -2.6],
+      "component": "superstructure",
+      "answer": { "type": "none", "severity": "none" },
+      "description": "拱圈东下缘一道深色「缝」远看疑似新裂缝;近观为湿砌缝色差加阴影,缝缘平顺、无宽度变化、无钙析新鲜痕迹——洪水退去的水渍线。",
+      "normNote": "结构完好:水渍线 / 色差不是裂缝——「不确定就不标」,避免误报扣分。(教学提示)"
+    }
+  ]
+}
