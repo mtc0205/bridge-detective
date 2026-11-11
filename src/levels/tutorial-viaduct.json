@@ -2,8 +2,9 @@
   "id": "tutorial-viaduct",
   "caseName": "城市高架·教学检测",
   "subtitle": "三跨预应力混凝土连续箱梁桥 · 日常定期检测",
-  "brief": "某城市高架桥为三跨预应力混凝土连续箱梁桥(90m×12m),建成 18 年。今日例行定期检测:请上桥巡查桥面系与栏杆,再下到桥下便道检查墩柱与支座,登记全部缺陷并评定技术状况。提示:至少一处疑似点实际完好——不确定就不标,误报扣分。",
+  "brief": "某城市高架桥为三跨预应力混凝土连续箱梁桥(90m×12m),建成 18 年。今日例行定期检测:请上桥巡查桥面系与栏杆,再下到桥下便道检查梁体、墩柱与支座,登记全部缺陷并评定技术状况。提示:至少一处疑似点实际完好——不确定就不标,误报扣分。按 G 可随时查阅判定图鉴(JTG/T H21-2011 简化)。",
   "timeLimitSec": 240,
+  "defectTypes": ["crack", "spalling", "bearingVoid", "expansionJoint", "railingDamage", "drainageBlock", "other"],
   "spawn": {
     "position": [-41, 9, 0],
     "yawDeg": -90
@@ -11,77 +12,96 @@
   "hotspots": [
     {
       "id": "joint-west",
-      "label": "西桥台伸缩缝",
+      "label": "西桥台接缝区",
       "position": [-44.2, 9.45, 2.0],
+      "component": "deck",
       "answer": { "type": "expansionJoint", "severity": "medium" },
       "description": "近景可见伸缩缝橡胶止水带整段老化断裂,缝内积土,一侧锚固混凝土压碎露骨,车辆通过时有明显跳动异响。",
-      "normNote": "JTG/T H21-2011 桥面系·伸缩缝:填缝材料老化、锚固区破损属中度缺损,需列入养护计划更换。(简化条目,编号 M1 核对)"
+      "normNote": "JTG/T H21-2011 桥面系·伸缩缝装置:填缝材料老化、锚固区破损属中度缺损,需列入养护计划更换。(简化条目)"
     },
     {
       "id": "crack-mesh",
-      "label": "桥面铺装·网状裂缝",
+      "label": "桥面西跨铺装",
       "position": [-31, 9.35, -1.8],
+      "component": "deck",
       "answer": { "type": "crack", "severity": "light" },
       "description": "桥面铺装出现网状龟裂,缝宽约 0.2mm,局部轻微起皮、泛白,未见错台与露筋。",
       "normNote": "JTG/T H21-2011:裂缝宽度 ≥0.2mm 需登记;网状裂缝按分布面积评定。本例缝宽 0.2mm、面积小,判「轻」。(简化)"
     },
     {
       "id": "drain-west",
-      "label": "桥面排水孔",
+      "label": "桥面西侧排水孔",
       "position": [-20, 9.3, -4.75],
+      "component": "deck",
       "answer": { "type": "drainageBlock", "severity": "medium" },
       "description": "桥面边缘排水孔被泥沙杂物堵死,雨后积水沿路缘漫流,栏杆根部已有青苔痕迹。",
       "normNote": "JTG/T H21-2011 桥面系·排水系统:排水孔堵塞导致路面积水,影响结构耐久性,判「中」。(简化)"
     },
     {
       "id": "rail-scrape",
-      "label": "防撞栏杆·刮擦破损",
+      "label": "南侧防撞栏杆中段",
       "position": [-9, 9.75, 5.55],
+      "component": "deck",
       "answer": { "type": "railingDamage", "severity": "light" },
       "description": "防撞栏杆受车辆刮擦,混凝土保护层成片剥落约 20cm×15cm,表层露筋轻度浮锈,未见深层锈蚀。",
       "normNote": "JTG/T H21-2011 附属设施·栏杆:局部破损露筋属轻度缺损,不影响结构安全,应及时修复。(简化)"
     },
     {
       "id": "crack-longitudinal",
-      "label": "箱梁顶板·纵向裂缝",
+      "label": "箱梁顶板桥轴线",
       "position": [2, 9.35, 1.0],
+      "component": "superstructure",
       "answer": { "type": "crack", "severity": "severe" },
       "description": "顶板纵向裂缝沿桥轴延伸近一跨,缝宽估测 0.4mm,缝缘有渗水钙化析出,疑似预应力损失引起。",
       "normNote": "JTG/T H21-2011:受力裂缝缝宽 ≥0.3mm 或贯穿分布判「重」,需专项检算与处治。(简化)"
     },
     {
       "id": "pothole-mid",
-      "label": "桥面铺装·坑槽",
+      "label": "桥面东跨铺装",
       "position": [16.5, 9.35, 3.2],
+      "component": "deck",
       "answer": { "type": "other", "severity": "light" },
       "description": "桥面铺装局部坑槽,直径约 15cm、深约 2cm,仅伤及铺装层,基层未外露。",
       "normNote": "JTG/T H21-2011 桥面系·铺装:浅坑槽未及基层属轻度缺损,纳入日常养护。(简化)"
     },
     {
+      "id": "decoy-rail-stain",
+      "label": "北侧栏杆东段",
+      "position": [30, 9.7, -5.55],
+      "component": "deck",
+      "answer": { "type": "none", "severity": "none" },
+      "description": "北侧栏杆表面一道纵向深色条纹,远看形似裂缝;近景观察边缘圆滑、无缝宽变化、无深度感,疑为陈旧水渍或模板色差。",
+      "normNote": "结构完好:水渍 / 色差不是裂缝——「不确定就不标」,避免误报扣分。(教学提示)"
+    },
+    {
+      "id": "crack-transverse",
+      "label": "箱梁南侧腹板",
+      "position": [33, 7.8, 4.3],
+      "interactRadius": 8,
+      "component": "superstructure",
+      "answer": { "type": "crack", "severity": "medium" },
+      "description": "腹板与底板交界处横向裂缝,缝宽约 0.25mm,延伸约 40cm,缝面潮湿伴钙析,近似竖向弯曲裂缝特征。",
+      "normNote": "JTG/T H21-2011:缝宽 0.25mm 已达登记阈值(≥0.2mm),未超 0.3mm 且未贯穿,综合判「中」,需标记观测。(简化)"
+    },
+    {
       "id": "spall-pier2",
-      "label": "2号墩柱·混凝土剥落",
+      "label": "2号墩南柱",
       "position": [15, 2.2, 3.55],
       "interactRadius": 4,
+      "component": "substructure",
       "answer": { "type": "spalling", "severity": "medium" },
       "description": "2号墩南侧墩柱表面混凝土剥落,露筋面积约 10cm×8cm,钢筋锈蚀扩展,敲击有空鼓声。",
       "normNote": "JTG/T H21-2011 下部结构·墩台:剥落露筋按面积与锈蚀深度分级,本例属中度,需凿除疏松层后修复。(简化)"
     },
     {
       "id": "bearing-void-pier1",
-      "label": "1号墩支座(南)",
+      "label": "1号墩南侧支座",
       "position": [-15, 6.55, 3.75],
       "interactRadius": 6,
+      "component": "substructure",
       "answer": { "type": "bearingVoid", "severity": "severe" },
       "description": "1号墩南侧板式支座与梁底间可见约 5mm 脱空缝隙,塞尺可插入,支座局部承压不均并伴随剪切变形。",
       "normNote": "JTG/T H21-2011:支座脱空属直接安全隐患,一经确认即判「重」,应立即限载并更换支座。(简化)"
-    },
-    {
-      "id": "decoy-rail-stain",
-      "label": "北侧栏杆·疑似裂缝(诱饵)",
-      "position": [30, 9.7, -5.55],
-      "answer": { "type": "none", "severity": "none" },
-      "description": "北侧栏杆表面一道纵向深色条纹,远看形似裂缝;近景观察边缘圆滑、无缝宽变化、无深度感,疑为陈旧水渍或模板色差。",
-      "normNote": "结构完好:水渍 / 色差不是裂缝——「不确定就不标」,避免误报扣分。(教学提示)"
     }
   ]
 }

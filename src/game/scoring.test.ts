@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { judge, SCORE_RULES } from './scoring';
 import type { HotspotAnswer } from './level';
 
-const truth = (type: HotspotAnswer['type'], severity: HotspotAnswer['severity']): HotspotAnswer => ({
-  type,
-  severity,
-});
+/** 便捷构造标准答案;任一侧为 none 即按「完好诱饵」构造(与判别联合约束一致)。 */
+const truth = (
+  type: HotspotAnswer['type'],
+  severity: 'light' | 'medium' | 'severe' | 'none',
+): HotspotAnswer => (type === 'none' || severity === 'none' ? { type: 'none', severity: 'none' } : { type, severity });
 
 describe('judge 判定计分(BRIEF 简化版)', () => {
   it('类型与严重度全对 → +100,计入 BCI', () => {

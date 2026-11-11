@@ -1,14 +1,9 @@
 /**
  * 判定与计分(纯逻辑,可单元测试)。
  *
- * 计分规则为 BRIEF v1 简化版;规范条目以 TODO 注释标出,M1 对齐 JTG/T H21-2011 后细化:
- * - TODO(规范条目): JTG/T H21-2011《公路桥梁技术状况评定标准》:
- *   1) 裂缝宽度 ≥0.2mm 需登记;≥0.3mm 或贯穿分布判「重」;
- *   2) 剥落露筋按面积/锈蚀深度分级;
- *   3) 支座脱空属直接安全隐患,一经确认即判「重」;
- *   4) 误报(把完好标记成缺陷)扣分,鼓励「不确定就不标」。
- *   M0 的严重度由关卡答案直接给定;M1 计划加「量测小游戏」(裂缝宽度尺 / 露筋面积框选)
- *   输出实测值,再按上述阈值映射严重度。
+ * 计分规则为 BRIEF v1 简化版;规范分级口径(裂缝 0.2/0.3mm 阈值、铆钉分级、
+ * 支座脱空即重等)已沉淀到 `src/game/codex.ts` 图鉴与各热点 normNote,
+ * 关卡答案即按该口径标定。M3 候选:量测小游戏(裂缝宽度尺)输出实测值映射严重度。
  */
 
 import { DEFECT_TYPE_LABELS, SEVERITY_LABELS } from './level';
@@ -53,7 +48,7 @@ export const SCORE_RULES = {
 } as const;
 
 function truthText(truth: HotspotAnswer): string {
-  if (truth.type === 'none' || truth.severity === 'none') return '结构完好';
+  if (truth.type === 'none') return '结构完好';
   return `${DEFECT_TYPE_LABELS[truth.type]} · ${SEVERITY_LABELS[truth.severity]}`;
 }
 
@@ -79,8 +74,8 @@ export function judge(choice: InspectChoice, truth: HotspotAnswer): Judgment {
     };
   }
 
-  // —— 真缺陷(parseLevel 保证 type/severity 均非 'none')——
-  const truthSeverity: Severity = truth.severity === 'none' ? 'medium' : truth.severity;
+  // —— 真缺陷(判别联合:type 非 none → severity 为三级之一)——
+  const truthSeverity: Severity = truth.severity;
   if (choice.kind === 'noDefect') {
     return {
       kind: 'missedDefect',
