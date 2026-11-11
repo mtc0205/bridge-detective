@@ -26,6 +26,8 @@ import { CodexView } from '../ui/codexView';
 import { ReportView } from '../ui/reportView';
 import type { ReportStats } from '../ui/reportView';
 import { Sfx } from '../audio/sfx';
+import { atmosphereValues, presetForLevel, URGENT_SECONDS } from './atmosphere';
+import type { AtmospherePreset } from './atmosphere';
 
 export interface GameHooks {
   /** 返回案件选择页 */
@@ -54,6 +56,13 @@ export class Game {
   private readonly sfx = new Sfx();
   private readonly canvas: HTMLCanvasElement;
   private readonly clock = new THREE.Clock();
+  /** 日落倒计时光影:场景灯光捕获 + 全屏色罩 */
+  private readonly atmoPreset: AtmospherePreset;
+  private readonly duskOverlay: HTMLElement;
+  private atmoSun: THREE.DirectionalLight | null = null;
+  private atmoHemi: THREE.HemisphereLight | null = null;
+  private atmoLastSec = -1;
+  private urgentNotified = false;
   private readonly startOverlay: HTMLElement;
   private readonly pauseOverlay: HTMLElement;
   private readonly replayBar: HTMLElement;
@@ -79,6 +88,17 @@ export class Game {
     this.asset = assetFactory(level);
     this.asset.decorateScene(this.scene);
     this.scene.add(this.asset.root);
+
+    // —— 日落倒计时光影:捕获资产布置的灯光,叠加全屏色罩 ——
+    this.atmoPreset = presetForLevel(level.id);
+    for (const light of this.scene.children) {
+      if (light instanceof THREE.DirectionalLight && !this.atmoSun) this.atmoSun = light;
+      else if (light instanceof THREE.HemisphereLight && !this.atmoHemi) this.atmoHemi = light;
+    }
+    this.duskOverlay = document.createElement('div');
+    this.duskOverlay.className = 'dusk-overlay';
+    this.host.append(this.duskOverlay);
+    this.applyAtmosphere(0);
 
     // —— 渲染器 ——
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -154,6 +174,7 @@ export class Game {
 
         this.session.tick(dt);
         this.hud.setTime(this.session.timeLeft, this.level.timeLimitSec);
+        this.updateAtmosphere();
         if (this.session.timeUp) {
           this.endGame('time');
         }
@@ -227,8 +248,40 @@ export class Game {
     this.resumeFromDialog();
   }
 
-  // —————————————————————— 图鉴 ——————————————————————
+  // —————————————————————— 日落倒计时光影 ——————————————————————
 
+  /** 按秒节流地推进氛围插值;最后 60 秒进入紧迫提示。 */
+  private updateAtmosphere(): void {
+    const sec = Math.ceil(this.session.timeLeft);
+    if (sec !== this.atmoLastSec) {
+      this.atmoLastSec = sec;
+      this.applyAtmosphere(1 - this.session.timeLeft / this.level.timeLimitSec);
+    }
+    if (!this.urgentNotified && this.session.timeLeft <= URGENT_SECONDS && !this.session.timeUp) {
+      this.urgentNotified = true;
+      this.duskOverlay.classList.add('urgent');
+      this.hud.toast('距时限不足 1 分钟,抓紧收尾', 'bad');
+      this.sfx.bad();
+    }
+  }
+
+  private applyAtmosphere(k: number): void {
+    const v = atmosphereValues(this.atmoPreset, k);
+    if (this.atmoSun) {
+      this.atmoSun.color.setHex(v.sunColor);
+      this.atmoSun.intensity = v.sunIntensity;
+    }
+    if (this.atmoHemi) this.atmoHemi.intensity = v.hemiIntensity;
+    if (this.scene.fog instanceof THREE.Fog) {
+      this.scene.fog.color.setHex(v.fogColor);
+      this.scene.fog.near = v.fogNear;
+      this.scene.fog.far = v.fogFar;
+    }
+    this.duskOverlay.style.background = `rgb(${v.overlayRgb})`;
+    this.duskOverlay.style.opacity = v.overlayOpacity.toFixed(3);
+  }
+
+  // —————————————————————— 图鉴 ——————————————————————
   private openCodex(from: 'playing' | 'dialog'): void {
     if (this.codex.visible) return;
     this.codexReturnState = from;
@@ -557,6 +610,7 @@ export class Game {
     this.startOverlay.remove();
     this.pauseOverlay.remove();
     this.replayBar.remove();
+    this.duskOverlay.remove();
     for (const child of [...this.scene.children]) this.scene.remove(child);
     this.renderer.dispose();
     this.canvas.remove();
