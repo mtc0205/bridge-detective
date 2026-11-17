@@ -75,7 +75,7 @@ export class CaseSelectView {
     footer.className = 'menu-footer';
     footer.innerHTML =
       '<span>WASD 移动 · 鼠标 视角 · <b>E</b> 检测 · <b>G</b> 图鉴 · Shift 加速 · Esc 暂停</span>' +
-      '<span>M1 交互闭环版(程序桥占位,Lux3D 资产 M2 接入)· 开发者:<b>?editor=1</b> 关卡编辑器</span>';
+      '<span>M4 · Lux3D 视觉已接入(Aholo Lux3D 图生3D 资产热替换,程序化兜底保留)· 开发者:<b>?editor=1</b> 关卡编辑器</span>';
 
     wrap.append(hero, cards, footer);
     this.backdrop.append(wrap);
